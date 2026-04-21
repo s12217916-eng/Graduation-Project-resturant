@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { registerUser } from '../../services/authService';
 export default function Register() {
     const navigate = useNavigate();
+
+    const [formData, setFormData] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone_number: '',
+        password: '',
+        role: 'client',
+        location: '',
+    });
+
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const customStyles = `
         .reg-section {
@@ -31,7 +44,14 @@ export default function Register() {
             border: 1px solid #eee;
             background-color: #f8f9fa;
         }
-        .form-control:focus {
+        .form-select {
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid #eee;
+            background-color: #f8f9fa;
+        }
+        .form-control:focus,
+        .form-select:focus {
             border-color: #fd7e14;
             box-shadow: 0 0 0 0.25rem rgba(253, 126, 20, 0.15);
             background-color: #fff;
@@ -56,6 +76,69 @@ export default function Register() {
         }
     `;
 
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+
+        if (
+            !formData.first_name ||
+            !formData.last_name ||
+            !formData.email ||
+            !formData.phone_number ||
+            !formData.password ||
+            !formData.role
+        ) {
+            setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const payload = {
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                email: formData.email,
+                password: formData.password,
+                phone_number: formData.phone_number,
+                role: formData.role,
+            };
+
+            await registerUser(payload);
+            navigate('/');
+        } catch (error) {
+            const data = error?.response?.data;
+
+            let message = 'فشل إنشاء الحساب، تأكد من البيانات';
+
+            if (typeof data === 'string') {
+                message = data;
+            } else if (data?.detail) {
+                message = data.detail;
+            } else if (data?.message) {
+                message = data.message;
+            } else if (typeof data === 'object' && data !== null) {
+                const firstKey = Object.keys(data)[0];
+                if (firstKey) {
+                    const firstError = data[firstKey];
+                    message = Array.isArray(firstError) ? firstError[0] : firstError;
+                }
+            }
+
+            setErrorMessage(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <section className="reg-section">
             <style>{customStyles}</style>
@@ -66,61 +149,127 @@ export default function Register() {
                     <p className="text-muted">انضم إلى مجتمع Dine Advisor واستمتع بأفضل العروض</p>
                 </div>
 
-                <form className="row g-3">
-                    {/* الاسم الأول والأخير بجانب بعض */}
+                {errorMessage && (
+                    <div className="alert alert-danger text-center py-2" role="alert">
+                        {errorMessage}
+                    </div>
+                )}
+
+                <form className="row g-3" onSubmit={handleSubmit}>
                     <div className="col-md-6">
                         <label className="form-label small fw-bold">الاسم الأول</label>
                         <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0 rounded-start-3"><i className="bi bi-person text-muted"></i></span>
-                            <input type="text" className="form-control border-start-0" placeholder="John" />
+                            <span className="input-group-text bg-transparent border-end-0 rounded-start-3">
+                                <i className="bi bi-person text-muted"></i>
+                            </span>
+                            <input
+                                type="text"
+                                name="first_name"
+                                className="form-control border-start-0"
+                                placeholder="John"
+                                value={formData.first_name}
+                                onChange={handleChange}
+                            />
                         </div>
                     </div>
 
                     <div className="col-md-6">
                         <label className="form-label small fw-bold">الاسم الأخير</label>
-                        <input type="text" className="form-control" placeholder="Doe" />
+                        <input
+                            type="text"
+                            name="last_name"
+                            className="form-control"
+                            placeholder="Doe"
+                            value={formData.last_name}
+                            onChange={handleChange}
+                        />
                     </div>
 
-                    {/* الإيميل */}
                     <div className="col-md-12">
                         <label className="form-label small fw-bold">البريد الإلكتروني</label>
                         <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0"><i className="bi bi-envelope text-muted"></i></span>
-                            <input type="email" className="form-control border-start-0" placeholder="name@example.com" />
+                            <span className="input-group-text bg-transparent border-end-0">
+                                <i className="bi bi-envelope text-muted"></i>
+                            </span>
+                            <input
+                                type="email"
+                                name="email"
+                                className="form-control border-start-0"
+                                placeholder="name@example.com"
+                                value={formData.email}
+                                onChange={handleChange}
+                            />
                         </div>
                     </div>
 
-                    {/* الهاتف والموقع بجانب بعض */}
                     <div className="col-md-6">
                         <label className="form-label small fw-bold">رقم الهاتف</label>
-                        <input type="tel" className="form-control" placeholder="05xxxxxxxx" />
+                        <input
+                            type="tel"
+                            name="phone_number"
+                            className="form-control"
+                            placeholder="05xxxxxxxx"
+                            value={formData.phone_number}
+                            onChange={handleChange}
+                        />
                     </div>
 
                     <div className="col-md-6">
                         <label className="form-label small fw-bold">الموقع</label>
-                        <input type="text" className="form-control" placeholder="رام الله، فلسطين" />
+                        <input
+                            type="text"
+                            name="location"
+                            className="form-control"
+                            placeholder="رام الله، فلسطين"
+                            value={formData.location}
+                            onChange={handleChange}
+                        />
                     </div>
 
-                    {/* كلمة المرور */}
+                    <div className="col-md-12">
+                        <label className="form-label small fw-bold">نوع الحساب</label>
+                        <select
+                            name="role"
+                            className="form-select"
+                            value={formData.role}
+                            onChange={handleChange}
+                        >
+                            <option value="client">Client</option>
+                            <option value="owner">Owner</option>
+                        </select>
+                    </div>
+
                     <div className="col-md-12">
                         <label className="form-label small fw-bold">كلمة المرور</label>
                         <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0"><i className="bi bi-lock text-muted"></i></span>
-                            <input type="password" className="form-control border-start-0" placeholder="••••••••" />
+                            <span className="input-group-text bg-transparent border-end-0">
+                                <i className="bi bi-lock text-muted"></i>
+                            </span>
+                            <input
+                                type="password"
+                                name="password"
+                                className="form-control border-start-0"
+                                placeholder="••••••••"
+                                value={formData.password}
+                                onChange={handleChange}
+                            />
                         </div>
                     </div>
 
-                    {/* زر التسجيل */}
                     <div className="col-md-12 mt-4">
-                        <button className="btn btn-reg w-100 shadow-sm" type="button">
-                            إنشاء الحساب
+                        <button
+                            className="btn btn-reg w-100 shadow-sm"
+                            type="submit"
+                            disabled={loading}
+                        >
+                            {loading ? 'جاري إنشاء الحساب...' : 'إنشاء الحساب'}
                         </button>
                     </div>
 
                     <div className="text-center mt-3">
-                        <p className="small">لديك حساب بالفعل؟ 
-                            <button 
-                                type="button" 
+                        <p className="small">لديك حساب بالفعل؟
+                            <button
+                                type="button"
                                 className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
                                 onClick={() => navigate('/login')}
                             >

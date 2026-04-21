@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from '../../services/authService';
 
 export default function Login() {
     const navigate = useNavigate();
+
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+    });
+
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const customStyles = `
         .login-section {
@@ -41,37 +50,86 @@ export default function Login() {
         }
     `;
 
+    const handleChange = (e) => {
+        const { id, value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [id]: value,
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+
+        if (!formData.email || !formData.password) {
+            setErrorMessage('يرجى تعبئة البريد الإلكتروني وكلمة المرور');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await loginUser(formData);
+            navigate('/');
+        }  catch (error) {
+    console.error(error);
+
+    const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'فشل تسجيل الدخول، تأكد من البيانات';
+
+    setErrorMessage(message);
+}finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <section className="login-section">
             <style>{customStyles}</style>
-            
+
             <div className="login-card mx-3">
                 <div className="text-center mb-4">
                     <h2 className="fw-bold text-dark">تسجيل الدخول</h2>
                     <p className="text-muted small">أهلاً بك مجدداً في Dine Advisor</p>
                 </div>
 
-                <form>
-                    {/* حقل اسم المستخدم */}
+                {errorMessage && (
+                    <div className="alert alert-danger text-center py-2" role="alert">
+                        {errorMessage}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
                     <div className="form-floating mb-3">
-                        <input 
-                            type="text" 
-                            className="form-control" 
-                            id="userName" 
-                            placeholder="اسم المستخدم" 
+                        <input
+                            type="email"
+                            className="form-control"
+                            id="email"
+                            placeholder="البريد الإلكتروني"
+                            value={formData.email}
+                            onChange={handleChange}
                         />
-                        <label htmlFor="userName"><i className="bi bi-person me-2"></i>اسم المستخدم</label>
+                        <label htmlFor="email">
+                            <i className="bi bi-envelope me-2"></i>البريد الإلكتروني
+                        </label>
                     </div>
 
-                    {/* حقل كلمة المرور */}
                     <div className="form-floating mb-3">
-                        <input 
-                            type="password" 
-                            className="form-control" 
-                            id="password" 
-                            placeholder="كلمة المرور" 
+                        <input
+                            type="password"
+                            className="form-control"
+                            id="password"
+                            placeholder="كلمة المرور"
+                            value={formData.password}
+                            onChange={handleChange}
                         />
-                        <label htmlFor="password"><i className="bi bi-lock me-2"></i>كلمة المرور</label>
+                        <label htmlFor="password">
+                            <i className="bi bi-lock me-2"></i>كلمة المرور
+                        </label>
                     </div>
 
                     <div className="d-flex justify-content-between align-items-center mb-4">
@@ -82,14 +140,18 @@ export default function Login() {
                         <a href="#" className="text-decoration-none small text-warning">نسيت كلمة المرور؟</a>
                     </div>
 
-                    <button className="btn btn-login w-100 py-3 rounded-pill mb-3">
-                        دخول
+                    <button
+                        type="submit"
+                        className="btn btn-login w-100 py-3 rounded-pill mb-3"
+                        disabled={loading}
+                    >
+                        {loading ? 'جاري تسجيل الدخول...' : 'دخول'}
                     </button>
 
                     <div className="text-center mt-3">
-                        <p className="small mb-0">ليس لديك حساب؟ 
-                            <button 
-                                type="button" 
+                        <p className="small mb-0">ليس لديك حساب؟
+                            <button
+                                type="button"
                                 className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
                                 onClick={() => navigate('/register')}
                             >
