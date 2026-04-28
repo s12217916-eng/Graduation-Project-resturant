@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaCalendarCheck, FaSignOutAlt, FaIdCard } from 'react-icons/fa';
+import { FaUserCircle, FaCalendarCheck, FaSignOutAlt, FaIdCard, FaHeart } from 'react-icons/fa';
 import { isAuthenticated, logoutUser } from '../services/authService';
 
 export default function Navbar() {
@@ -124,6 +124,17 @@ export default function Navbar() {
                   </Link>
                 </li>
               )}
+              {loggedIn && (
+  <li className="nav-item">
+    <Link
+      className={`nav-link ${location.pathname === '/saved-restaurants' ? 'active' : ''}`}
+      to="/saved-restaurants"
+    >
+      <FaHeart className="ms-1" />
+      المفضلة
+    </Link>
+  </li>
+)}
 
               {loggedIn && (
                 <li className="nav-item">

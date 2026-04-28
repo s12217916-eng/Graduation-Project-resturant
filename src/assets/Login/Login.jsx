@@ -153,7 +153,7 @@ export default function Login() {
                             <button
                                 type="button"
                                 className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
-                                onClick={() => navigate('/register')}
+                                onClick={() => navigate('/registerchoice')}
                             >
                                 سجل الآن
                             </button>

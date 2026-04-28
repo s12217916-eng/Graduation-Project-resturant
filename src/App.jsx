@@ -15,12 +15,16 @@ import Chatbot from './Chatbot/Chatbot'
 import MyReservation from './MyReservation/MyReservation'
 import Profile from './Profile/Profile';
 import Dashboard from './dashboard/Dashboard';
+import Home from './Home/Home'
+import RegisterChoice from './RegisterChoice/RegisterChoice'
+import SavedRestaurants from './SavedRestaurants/SavedRestaurants'
+
 function App() {
   return (
     <>
       <Navbar />
       <Routes>
-        <Route path="/" element={<Hero />} />
+        <Route path="/" element={<Home />} />
         
         {/* التعديل هون: ضفنا :id عشان صفحة الحجز تستقبل رقم المطعم */}
         <Route path="/reservation/:id" element={<Reservation />} />
@@ -32,10 +36,13 @@ function App() {
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/registerchoice" element={<RegisterChoice />} />
        <Route path="/ratingform/:id" element={<RatingForm />} />
         <Route path="/myreservations" element={<MyReservation />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/register/:roleType" element={<Register />} />
+        <Route path="/savedrestaurants" element={<SavedRestaurants />} />
       </Routes>
       <Chatbot />
       <Footer />

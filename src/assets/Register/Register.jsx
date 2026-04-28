@@ -1,284 +1,425 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { registerUser } from '../../services/authService';
+
 export default function Register() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const { roleType } = useParams();
 
-    const [formData, setFormData] = useState({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone_number: '',
-        password: '',
-        role: 'client',
-        location: '',
-    });
+  const accountRole = useMemo(() => {
+    return roleType === 'owner' ? 'owner' : 'client';
+  }, [roleType]);
 
-    const [loading, setLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
+  const isOwner = accountRole === 'owner';
 
-    const customStyles = `
-        .reg-section {
-            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('/hero2.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 50px 0;
-        }
-        .reg-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 25px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            width: 100%;
-            max-width: 700px;
-        }
-        .form-control {
-            border-radius: 10px;
-            padding: 12px;
-            border: 1px solid #eee;
-            background-color: #f8f9fa;
-        }
-        .form-select {
-            border-radius: 10px;
-            padding: 12px;
-            border: 1px solid #eee;
-            background-color: #f8f9fa;
-        }
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #fd7e14;
-            box-shadow: 0 0 0 0.25rem rgba(253, 126, 20, 0.15);
-            background-color: #fff;
-        }
-        .btn-reg {
-            background: linear-gradient(135deg, #fd7e14 0%, #ff4d4d 100%);
-            border: none;
-            color: white;
-            font-weight: bold;
-            padding: 14px;
-            border-radius: 50px;
-            transition: all 0.3s;
-        }
-        .btn-reg:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(253, 126, 20, 0.3);
-            color: white;
-        }
-        .reg-header h2 {
-            font-weight: 800;
-            color: #212529;
-        }
-    `;
+const [formData, setFormData] = useState({
+  first_name: '',
+  last_name: '',
+  email: '',
+  phone_number: '',
+  password: '',
+  location: '',
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+  restaurant_name: '',
+  restaurant_location: '',
+  table_capacity: '',
+  national_id_image: null,
+  restaurant_license: null,
+  notes: '',
+});
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const customStyles = `
+    .reg-section {
+      background: linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)), url('/hero2.jpg');
+      background-size: cover;
+      background-position: center;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 50px 0;
+      direction: rtl;
+    }
+
+    .reg-card {
+      background: rgba(255,255,255,.96);
+      border-radius: 25px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.4);
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .form-control {
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid #eee;
+      background-color: #f8f9fa;
+    }
+
+    .form-control:focus {
+      border-color: #fd7e14;
+      box-shadow: 0 0 0 .25rem rgba(253,126,20,.15);
+      background-color: #fff;
+    }
+
+    .btn-reg {
+      background: linear-gradient(135deg, #fd7e14 0%, #ff4d4d 100%);
+      border: none;
+      color: white;
+      font-weight: bold;
+      padding: 14px;
+      border-radius: 50px;
+      transition: .3s;
+    }
+
+    .btn-reg:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 20px rgba(253,126,20,.3);
+      color: white;
+    }
+
+    .role-badge {
+      display: inline-block;
+      background: ${isOwner ? '#212529' : '#fd7e14'};
+      color: white;
+      padding: 8px 18px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .section-title {
+      background: #fff3e8;
+      border-right: 4px solid #fd7e14;
+      padding: 10px 15px;
+      border-radius: 10px;
+      font-weight: bold;
+      margin: 20px 0 10px;
+    }
+  `;
+
+  const handleChange = (e) => {
+    const { name, value, files, type } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'file' ? files[0] : value,
+    }));
+  };
+
+  const validateOwnerFields = () => {
+    if (!isOwner) return true;
+
+    if (
+      !formData.restaurant_name ||
+      !formData.restaurant_location ||
+      !formData.table_capacity ||
+      !formData.national_id_image ||
+      !formData.restaurant_license
+    ) {
+      setErrorMessage('يرجى تعبئة جميع بيانات مالك المطعم ورفع الملفات المطلوبة');
+      return false;
+    }
+
+    return true;
+  };
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setErrorMessage('');
+
+  if (
+    !formData.first_name ||
+    !formData.last_name ||
+    !formData.email ||
+    !formData.phone_number ||
+    !formData.password
+  ) {
+    setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    if (!isOwner) {
+      const payload = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        password: formData.password,
+        phone_number: formData.phone_number,
+      };
+
+      await registerUser(payload);
+      navigate('/login');
+      return;
+    }
+
+    // مؤقتًا للمالك: ما بنشبك API الآن
+    const ownerDraft = {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email,
+      phone_number: formData.phone_number,
+      location: formData.location,
+      restaurant_name: formData.restaurant_name,
+      restaurant_location: formData.restaurant_location,
+      table_capacity: formData.table_capacity,
+      national_id_image_name: formData.national_id_image?.name,
+      restaurant_license_name: formData.restaurant_license?.name,
+      notes: formData.notes,
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setErrorMessage('');
+    localStorage.setItem('ownerApplicationDraft', JSON.stringify(ownerDraft));
+    navigate('/login');
+  } catch (error) {
+    const data = error?.response?.data;
 
-        if (
-            !formData.first_name ||
-            !formData.last_name ||
-            !formData.email ||
-            !formData.phone_number ||
-            !formData.password ||
-            !formData.role
-        ) {
-            setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
-            return;
-        }
+    let message = 'فشل إنشاء الحساب، تأكد من البيانات';
 
-        try {
-            setLoading(true);
+    if (typeof data === 'string') {
+      message = data;
+    } else if (data?.detail) {
+      message = data.detail;
+    } else if (data?.message) {
+      message = data.message;
+    } else if (typeof data === 'object' && data !== null) {
+      const firstKey = Object.keys(data)[0];
+      if (firstKey) {
+        const firstError = data[firstKey];
+        message = Array.isArray(firstError) ? firstError[0] : firstError;
+      }
+    }
 
-            const payload = {
-                first_name: formData.first_name,
-                last_name: formData.last_name,
-                email: formData.email,
-                password: formData.password,
-                phone_number: formData.phone_number,
-                role: formData.role,
-            };
+    setErrorMessage(message);
+  } finally {
+    setLoading(false);
+  }
+};
 
-            await registerUser(payload);
-            navigate('/');
-        } catch (error) {
-            const data = error?.response?.data;
+  return (
+    <section className="reg-section">
+      <style>{customStyles}</style>
 
-            let message = 'فشل إنشاء الحساب، تأكد من البيانات';
+      <div className="reg-card mx-3">
+        <div className="text-center mb-4">
+          <h2 className="fw-bold">
+            {isOwner ? 'تسجيل مالك مطعم' : 'تسجيل مستخدم عادي'}
+          </h2>
 
-            if (typeof data === 'string') {
-                message = data;
-            } else if (data?.detail) {
-                message = data.detail;
-            } else if (data?.message) {
-                message = data.message;
-            } else if (typeof data === 'object' && data !== null) {
-                const firstKey = Object.keys(data)[0];
-                if (firstKey) {
-                    const firstError = data[firstKey];
-                    message = Array.isArray(firstError) ? firstError[0] : firstError;
-                }
-            }
+          <span className="role-badge">
+            {isOwner ? 'Owner' : 'Client'}
+          </span>
 
-            setErrorMessage(message);
-        } finally {
-            setLoading(false);
-        }
-    };
+          <p className="text-muted mt-3 mb-0">
+            {isOwner
+              ? 'أدخل بياناتك وبيانات مطعمك للتحقق من الحساب'
+              : 'أنشئ حسابك واحجز من أفضل المطاعم'}
+          </p>
+        </div>
 
-    return (
-        <section className="reg-section">
-            <style>{customStyles}</style>
+        {errorMessage && (
+          <div className="alert alert-danger text-center py-2">
+            {errorMessage}
+          </div>
+        )}
 
-            <div className="reg-card mx-3">
-                <div className="reg-header text-center mb-4">
-                    <h2>إنشاء حساب جديد</h2>
-                    <p className="text-muted">انضم إلى مجتمع Dine Advisor واستمتع بأفضل العروض</p>
-                </div>
+        <form className="row g-3" onSubmit={handleSubmit}>
+          <div className="section-title">بيانات الحساب</div>
 
-                {errorMessage && (
-                    <div className="alert alert-danger text-center py-2" role="alert">
-                        {errorMessage}
-                    </div>
-                )}
+          <div className="col-md-6">
+            <label className="form-label small fw-bold">الاسم الأول</label>
+            <input
+              type="text"
+              name="first_name"
+              className="form-control"
+              value={formData.first_name}
+              onChange={handleChange}
+              placeholder="John"
+            />
+          </div>
 
-                <form className="row g-3" onSubmit={handleSubmit}>
-                    <div className="col-md-6">
-                        <label className="form-label small fw-bold">الاسم الأول</label>
-                        <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0 rounded-start-3">
-                                <i className="bi bi-person text-muted"></i>
-                            </span>
-                            <input
-                                type="text"
-                                name="first_name"
-                                className="form-control border-start-0"
-                                placeholder="John"
-                                value={formData.first_name}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+          <div className="col-md-6">
+            <label className="form-label small fw-bold">الاسم الأخير</label>
+            <input
+              type="text"
+              name="last_name"
+              className="form-control"
+              value={formData.last_name}
+              onChange={handleChange}
+              placeholder="Doe"
+            />
+          </div>
 
-                    <div className="col-md-6">
-                        <label className="form-label small fw-bold">الاسم الأخير</label>
-                        <input
-                            type="text"
-                            name="last_name"
-                            className="form-control"
-                            placeholder="Doe"
-                            value={formData.last_name}
-                            onChange={handleChange}
-                        />
-                    </div>
+          <div className="col-md-12">
+            <label className="form-label small fw-bold">البريد الإلكتروني</label>
+            <input
+              type="email"
+              name="email"
+              className="form-control"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="name@example.com"
+            />
+          </div>
 
-                    <div className="col-md-12">
-                        <label className="form-label small fw-bold">البريد الإلكتروني</label>
-                        <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0">
-                                <i className="bi bi-envelope text-muted"></i>
-                            </span>
-                            <input
-                                type="email"
-                                name="email"
-                                className="form-control border-start-0"
-                                placeholder="name@example.com"
-                                value={formData.email}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+          <div className="col-md-6">
+            <label className="form-label small fw-bold">رقم الهاتف</label>
+            <input
+              type="tel"
+              name="phone_number"
+              className="form-control"
+              value={formData.phone_number}
+              onChange={handleChange}
+              placeholder="05xxxxxxxx"
+            />
+          </div>
 
-                    <div className="col-md-6">
-                        <label className="form-label small fw-bold">رقم الهاتف</label>
-                        <input
-                            type="tel"
-                            name="phone_number"
-                            className="form-control"
-                            placeholder="05xxxxxxxx"
-                            value={formData.phone_number}
-                            onChange={handleChange}
-                        />
-                    </div>
+          <div className="col-md-6">
+            <label className="form-label small fw-bold">الموقع</label>
+            <input
+              type="text"
+              name="location"
+              className="form-control"
+              value={formData.location}
+              onChange={handleChange}
+              placeholder="رام الله، فلسطين"
+            />
+          </div>
 
-                    <div className="col-md-6">
-                        <label className="form-label small fw-bold">الموقع</label>
-                        <input
-                            type="text"
-                            name="location"
-                            className="form-control"
-                            placeholder="رام الله، فلسطين"
-                            value={formData.location}
-                            onChange={handleChange}
-                        />
-                    </div>
+          <div className="col-md-12">
+            <label className="form-label small fw-bold">كلمة المرور</label>
+            <input
+              type="password"
+              name="password"
+              className="form-control"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="••••••••"
+            />
+          </div>
 
-                    <div className="col-md-12">
-                        <label className="form-label small fw-bold">نوع الحساب</label>
-                        <select
-                            name="role"
-                            className="form-select"
-                            value={formData.role}
-                            onChange={handleChange}
-                        >
-                            <option value="client">Client</option>
-                            <option value="owner">Owner</option>
-                        </select>
-                    </div>
+          {isOwner && (
+            <>
+              <div className="section-title">بيانات المطعم والتحقق</div>
 
-                    <div className="col-md-12">
-                        <label className="form-label small fw-bold">كلمة المرور</label>
-                        <div className="input-group">
-                            <span className="input-group-text bg-transparent border-end-0">
-                                <i className="bi bi-lock text-muted"></i>
-                            </span>
-                            <input
-                                type="password"
-                                name="password"
-                                className="form-control border-start-0"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">اسم المطعم</label>
+                <input
+                  type="text"
+                  name="restaurant_name"
+                  className="form-control"
+                  value={formData.restaurant_name}
+                  onChange={handleChange}
+                  placeholder="مثال: مطعم الياسمين"
+                />
+              </div>
 
-                    <div className="col-md-12 mt-4">
-                        <button
-                            className="btn btn-reg w-100 shadow-sm"
-                            type="submit"
-                            disabled={loading}
-                        >
-                            {loading ? 'جاري إنشاء الحساب...' : 'إنشاء الحساب'}
-                        </button>
-                    </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">موقع المطعم</label>
+                <input
+                  type="text"
+                  name="restaurant_location"
+                  className="form-control"
+                  value={formData.restaurant_location}
+                  onChange={handleChange}
+                  placeholder="المدينة / الشارع"
+                />
+              </div>
 
-                    <div className="text-center mt-3">
-                        <p className="small">لديك حساب بالفعل؟
-                            <button
-                                type="button"
-                                className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
-                                onClick={() => navigate('/login')}
-                            >
-                                تسجيل الدخول
-                            </button>
-                        </p>
-                    </div>
-                </form>
-            </div>
-        </section>
-    );
+              <div className="col-md-12">
+                <label className="form-label small fw-bold">كم طاولة بوسع مطعمك؟</label>
+                <input
+                  type="number"
+                  name="table_capacity"
+                  className="form-control"
+                  min="1"
+                  value={formData.table_capacity}
+                  onChange={handleChange}
+                  placeholder="مثال: 25"
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">صورة الهوية</label>
+                <input
+                  type="file"
+                  name="national_id_image"
+                  className="form-control"
+                  accept="image/*,.pdf"
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">رخصة المطعم</label>
+                <input
+                  type="file"
+                  name="restaurant_license"
+                  className="form-control"
+                  accept="image/*,.pdf"
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="col-md-12">
+                <label className="form-label small fw-bold">ملاحظات إضافية</label>
+                <textarea
+                  name="notes"
+                  className="form-control"
+                  rows="3"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  placeholder="أي معلومات إضافية عن المطعم"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="col-md-12 mt-4">
+            <button
+              className="btn btn-reg w-100 shadow-sm"
+              type="submit"
+              disabled={loading}
+            >
+              {loading
+                ? 'جاري إنشاء الحساب...'
+                : isOwner
+                ? 'إرسال طلب تسجيل مالك مطعم'
+                : 'إنشاء حساب مستخدم عادي'}
+            </button>
+          </div>
+
+          <div className="text-center mt-3">
+            <p className="small">
+              تريد تغيير نوع الحساب؟
+              <button
+                type="button"
+                className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
+                onClick={() => navigate('/registerchoice', { replace: true })}
+              >
+                رجوع للاختيار
+              </button>
+            </p>
+
+            <p className="small">
+              لديك حساب بالفعل؟
+              <button
+                type="button"
+                className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
+                onClick={() => navigate('/login')}
+              >
+                تسجيل الدخول
+              </button>
+            </p>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
 }

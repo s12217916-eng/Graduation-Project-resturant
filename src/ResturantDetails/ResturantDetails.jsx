@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import axios from 'axios';
 import {
   FaMapMarkerAlt,
@@ -48,7 +49,8 @@ export default function ResturantDetails() {
 
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState('');
-
+const [isSaved, setIsSaved] = useState(false);
+const [saving, setSaving] = useState(false);
   useEffect(() => {
     const fetchRestaurantData = async () => {
       setLoading(true);
@@ -122,92 +124,154 @@ export default function ResturantDetails() {
     ));
   };
 
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
-    setReviewError('');
+const handleSubmitReview = async (e) => {
+  e.preventDefault();
+  setReviewError('');
 
-    const access = localStorage.getItem('access');
-console.log('REVIEW HANDLE RUNNING');
-console.log('REVIEW ACCESS TOKEN =>', access);
-console.log('REVIEW PAYLOAD =>', payload);
-    if (!access) {
-      setReviewError('يجب تسجيل الدخول أولاً لإضافة تقييم');
-      navigate('/login');
-      return;
-    }
+  const access = localStorage.getItem('access');
 
-    if (
-      !reviewForm.food_rate ||
-      !reviewForm.service_rate ||
-      !reviewForm.ambiance_rate
-    ) {
-      setReviewError('يرجى تعبئة جميع التقييمات');
-      return;
-    }
-
-    if (!reviewForm.comment.trim()) {
-      setReviewError('يرجى كتابة تعليق');
-      return;
-    }
-
-    if (!reviewForm.menu_id) {
-      setReviewError('يرجى اختيار صنف من القائمة');
-      return;
-    }
-
-    const payload = {
-      comment: reviewForm.comment.trim(),
-      food_rate: Number(reviewForm.food_rate),
-      service_rate: Number(reviewForm.service_rate),
-      ambiance_rate: Number(reviewForm.ambiance_rate),
-      menu_id: reviewForm.menu_id,
-    };
-
-    try {
-      setReviewLoading(true);
-
-      await axios.post(
-  `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`,
-  payload,
-  {
-    headers: {
-      Authorization: `Bearer ${access}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'X-Debug-From': 'RestaurantDetails-review',
-    },
+  if (!access) {
+    setReviewError('يجب تسجيل الدخول أولاً لإضافة تقييم');
+    navigate('/login');
+    return;
   }
-);
 
-      const resReviews = await axios.get(
-        `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`
-      );
+  if (
+    !reviewForm.food_rate ||
+    !reviewForm.service_rate ||
+    !reviewForm.ambiance_rate
+  ) {
+    setReviewError('يرجى تعبئة جميع التقييمات');
+    return;
+  }
 
-      setReviews(resReviews.data.results || []);
+  if (!reviewForm.comment.trim()) {
+    setReviewError('يرجى كتابة تعليق');
+    return;
+  }
 
-      setReviewForm((prev) => ({
-        ...prev,
-        comment: '',
-        food_rate: 0,
-        service_rate: 0,
-        ambiance_rate: 0,
-      }));
+  if (!reviewForm.menu_id) {
+    setReviewError('يرجى اختيار صنف من القائمة');
+    return;
+  }
 
-      setActiveTab('reviews');
-      alert('تم إرسال التقييم بنجاح');
-    } catch (error) {
-      console.error('Create review error:', error?.response?.data || error);
-
-      setReviewError(
-        error?.response?.data?.detail ||
-          error?.response?.data?.message ||
-          'فشل إرسال التقييم'
-      );
-    } finally {
-      setReviewLoading(false);
-    }
+  const payload = {
+    comment: reviewForm.comment.trim(),
+    food_rate: Number(reviewForm.food_rate),
+    service_rate: Number(reviewForm.service_rate),
+    ambiance_rate: Number(reviewForm.ambiance_rate),
+    menu_id: reviewForm.menu_id,
   };
 
+  console.log('REVIEW HANDLE RUNNING');
+  console.log('REVIEW ACCESS TOKEN =>', access);
+  console.log('REVIEW PAYLOAD =>', payload);
+
+  try {
+    setReviewLoading(true);
+
+    await axios.post(
+      `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${access}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    const resReviews = await axios.get(
+      `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`
+    );
+
+    setReviews(resReviews.data.results || resReviews.data || []);
+
+    setReviewForm((prev) => ({
+      ...prev,
+      comment: '',
+      food_rate: 0,
+      service_rate: 0,
+      ambiance_rate: 0,
+    }));
+
+    setActiveTab('reviews');
+    alert('تم إرسال التقييم بنجاح');
+  } catch (error) {
+    console.error('Create review error:', error?.response?.data || error);
+
+    setReviewError(
+      error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        'فشل إرسال التقييم'
+    );
+  } finally {
+    setReviewLoading(false);
+  }
+};
+const handleSaveRestaurant = async () => {
+  console.log('SAVE CLICKED');
+
+  const access = localStorage.getItem('access');
+
+  console.log('TOKEN =>', access);
+  console.log('RESTAURANT ID =>', id);
+
+  if (!access) {
+    alert('لازم تسجل دخول');
+    navigate('/login');
+    return;
+  }
+
+  try {
+    setSaving(true);
+
+    if (isSaved) {
+      console.log('DELETE REQUEST');
+
+      await axios.delete(
+        `https://revvo-server.onrender.com/api/restaurants/${id}/save/`,
+        {
+          headers: {
+            Authorization: `Bearer ${access}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      setIsSaved(false);
+      alert('تمت الإزالة من المفضلة');
+    } else {
+      console.log('POST REQUEST');
+
+      await axios.post(
+        `https://revvo-server.onrender.com/api/restaurants/${id}/save/`,
+        {}, // مهم يضل موجود
+        {
+          headers: {
+            Authorization: `Bearer ${access}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      setIsSaved(true);
+      alert('تمت الإضافة للمفضلة');
+    }
+  } catch (error) {
+    console.error('FULL ERROR =>', error);
+    console.error('RESPONSE =>', error?.response?.data);
+
+    alert(
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      'فشل الحفظ'
+    );
+  } finally {
+    setSaving(false);
+  }
+};
   if (loading) {
     return (
       <div className="vh-100 d-flex justify-content-center align-items-center bg-white">
@@ -608,9 +672,20 @@ console.log('REVIEW PAYLOAD =>', payload);
                   className="btn-reserve-luxury fs-5 shadow-lg"
                   onClick={() => navigate(`/reservation/${id}`)}
                 >
+                  
                   <FaCalendarCheck className="ms-2" /> تأكيد الحجز فورا
                 </button>
-
+<button
+  type="button"
+  className={`btn w-100 mt-3 rounded-pill fw-bold py-3 ${
+    isSaved ? 'btn-danger' : 'btn-outline-danger'
+  }`}
+  onClick={handleSaveRestaurant}
+  disabled={saving}
+>
+  {isSaved ? <FaHeart className="ms-2" /> : <FaRegHeart className="ms-2" />}
+  {saving ? 'جاري التنفيذ...' : isSaved ? 'إزالة من المفضلة' : 'حفظ المطعم'}
+</button>
                 <p className="text-muted small mt-3 m-0">لا توجد رسوم إضافية على الحجز</p>
               </div>
 
