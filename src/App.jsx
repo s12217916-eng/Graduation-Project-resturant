@@ -42,7 +42,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/register/:roleType" element={<Register />} />
-        <Route path="/savedrestaurants" element={<SavedRestaurants />} />
+        <Route path="/saved-restaurants" element={<SavedRestaurants />} />
       </Routes>
       <Chatbot />
       <Footer />

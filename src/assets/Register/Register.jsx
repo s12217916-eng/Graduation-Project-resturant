@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import { registerUser } from '../../services/authService';
+
+const FIXED_RESTAURANT_ID = '24efd7fc-96f8-4259-8258-839b35e52bb9';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -12,21 +15,20 @@ export default function Register() {
 
   const isOwner = accountRole === 'owner';
 
-const [formData, setFormData] = useState({
-  first_name: '',
-  last_name: '',
-  email: '',
-  phone_number: '',
-  password: '',
-  location: '',
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone_number: '',
+    password: '',
+    location: '',
 
-  restaurant_name: '',
-  restaurant_location: '',
-  table_capacity: '',
-  national_id_image: null,
-  restaurant_license: null,
-  notes: '',
-});
+    license_number: '',
+    license_expiry: '',
+    license_image: null,
+    id_image: null,
+  });
+
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -115,69 +117,27 @@ const [formData, setFormData] = useState({
     if (!isOwner) return true;
 
     if (
-      !formData.restaurant_name ||
-      !formData.restaurant_location ||
-      !formData.table_capacity ||
-      !formData.national_id_image ||
-      !formData.restaurant_license
+      !formData.license_number ||
+      !formData.license_expiry ||
+      !formData.license_image ||
+      !formData.id_image
     ) {
-      setErrorMessage('يرجى تعبئة جميع بيانات مالك المطعم ورفع الملفات المطلوبة');
+      setErrorMessage('يرجى تعبئة جميع بيانات الرخصة ورفع الصور المطلوبة');
       return false;
     }
 
     return true;
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setErrorMessage('');
-
-  if (
-    !formData.first_name ||
-    !formData.last_name ||
-    !formData.email ||
-    !formData.phone_number ||
-    !formData.password
-  ) {
-    setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    if (!isOwner) {
-      const payload = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        password: formData.password,
-        phone_number: formData.phone_number,
-      };
-
-      await registerUser(payload);
-      navigate('/login');
-      return;
-    }
-
-    // مؤقتًا للمالك: ما بنشبك API الآن
-    const ownerDraft = {
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-      email: formData.email,
-      phone_number: formData.phone_number,
-      location: formData.location,
-      restaurant_name: formData.restaurant_name,
-      restaurant_location: formData.restaurant_location,
-      table_capacity: formData.table_capacity,
-      national_id_image_name: formData.national_id_image?.name,
-      restaurant_license_name: formData.restaurant_license?.name,
-      notes: formData.notes,
-    };
-
-    localStorage.setItem('ownerApplicationDraft', JSON.stringify(ownerDraft));
-    navigate('/login');
-  } catch (error) {
+const getTokenFromRegisterResponse = (data) => {
+  return (
+    data?.tokens?.access ||
+    data?.access ||
+    data?.access_token ||
+    data?.token
+  );
+};
+  const getErrorMessage = (error) => {
     const data = error?.response?.data;
 
     let message = 'فشل إنشاء الحساب، تأكد من البيانات';
@@ -190,17 +150,96 @@ const handleSubmit = async (e) => {
       message = data.message;
     } else if (typeof data === 'object' && data !== null) {
       const firstKey = Object.keys(data)[0];
+
       if (firstKey) {
         const firstError = data[firstKey];
         message = Array.isArray(firstError) ? firstError[0] : firstError;
       }
     }
 
-    setErrorMessage(message);
-  } finally {
-    setLoading(false);
-  }
+    return message;
+  };
+
+  const addOwnerLicense = async (token) => {
+    const licenseFormData = new FormData();
+
+    licenseFormData.append('license_number', formData.license_number);
+
+    licenseFormData.append(
+      'license_expiry',
+      new Date(formData.license_expiry).toISOString()
+    );
+
+    licenseFormData.append('license_image', formData.license_image);
+    licenseFormData.append('id_image', formData.id_image);
+
+    return axios.post(
+      `https://revvo-server.onrender.com/api/owner/restaurants/${FIXED_RESTAURANT_ID}/license/`,
+      licenseFormData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    if (
+      !formData.first_name ||
+      !formData.last_name ||
+      !formData.email ||
+      !formData.phone_number ||
+      !formData.password
+    ) {
+      setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
+      return;
+    }
+
+    if (!validateOwnerFields()) return;
+
+    try {
+      setLoading(true);
+
+ const payload = {
+  first_name: formData.first_name,
+  last_name: formData.last_name,
+  email: formData.email,
+  password: formData.password,
+  phone_number: formData.phone_number,
+  role: isOwner ? 'OWNER' : 'CLIENT',
 };
+
+      const registerResponse = await registerUser(payload);
+
+      if (!isOwner) {
+        navigate('/login');
+        return;
+      }
+
+      const token = getTokenFromRegisterResponse(registerResponse);
+
+      if (!token) {
+        setErrorMessage('تم إنشاء الحساب لكن لم يتم استلام التوكن');
+        return;
+      }
+
+      localStorage.setItem('token', token);
+
+      await addOwnerLicense(token);
+
+      navigate('/login');
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setLoading(false)
+      console.log(registerResponse.user.role);
+    }
+  };
 
   return (
     <section className="reg-section">
@@ -218,7 +257,7 @@ const handleSubmit = async (e) => {
 
           <p className="text-muted mt-3 mb-0">
             {isOwner
-              ? 'أدخل بياناتك وبيانات مطعمك للتحقق من الحساب'
+              ? 'أدخل بياناتك وبيانات الرخصة للتحقق من الحساب'
               : 'أنشئ حسابك واحجز من أفضل المطاعم'}
           </p>
         </div>
@@ -306,42 +345,41 @@ const handleSubmit = async (e) => {
 
           {isOwner && (
             <>
-              <div className="section-title">بيانات المطعم والتحقق</div>
+              <div className="section-title">بيانات الرخصة</div>
 
               <div className="col-md-6">
-                <label className="form-label small fw-bold">اسم المطعم</label>
-                <input
-                  type="text"
-                  name="restaurant_name"
-                  className="form-control"
-                  value={formData.restaurant_name}
-                  onChange={handleChange}
-                  placeholder="مثال: مطعم الياسمين"
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">موقع المطعم</label>
-                <input
-                  type="text"
-                  name="restaurant_location"
-                  className="form-control"
-                  value={formData.restaurant_location}
-                  onChange={handleChange}
-                  placeholder="المدينة / الشارع"
-                />
-              </div>
-
-              <div className="col-md-12">
-                <label className="form-label small fw-bold">كم طاولة بوسع مطعمك؟</label>
+                <label className="form-label small fw-bold">رقم الرخصة</label>
                 <input
                   type="number"
-                  name="table_capacity"
+                  name="license_number"
                   className="form-control"
-                  min="1"
-                  value={formData.table_capacity}
+                  value={formData.license_number}
                   onChange={handleChange}
-                  placeholder="مثال: 25"
+                  placeholder="123456789"
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">
+                  تاريخ انتهاء الرخصة
+                </label>
+                <input
+                  type="date"
+                  name="license_expiry"
+                  className="form-control"
+                  value={formData.license_expiry}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label small fw-bold">صورة الرخصة</label>
+                <input
+                  type="file"
+                  name="license_image"
+                  className="form-control"
+                  accept="image/*"
+                  onChange={handleChange}
                 />
               </div>
 
@@ -349,33 +387,10 @@ const handleSubmit = async (e) => {
                 <label className="form-label small fw-bold">صورة الهوية</label>
                 <input
                   type="file"
-                  name="national_id_image"
+                  name="id_image"
                   className="form-control"
-                  accept="image/*,.pdf"
+                  accept="image/*"
                   onChange={handleChange}
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">رخصة المطعم</label>
-                <input
-                  type="file"
-                  name="restaurant_license"
-                  className="form-control"
-                  accept="image/*,.pdf"
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="col-md-12">
-                <label className="form-label small fw-bold">ملاحظات إضافية</label>
-                <textarea
-                  name="notes"
-                  className="form-control"
-                  rows="3"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  placeholder="أي معلومات إضافية عن المطعم"
                 />
               </div>
             </>
