@@ -161,7 +161,7 @@ export default function Resturant() {
                                     onClick={() => navigate(`/resturant/${item.id}`)}
                                 >
                                     <div className="position-relative">
-                                        <img src={item.image} className="w-100" alt={item.name} style={{ height: '240px', objectFit: 'cover' }} />
+                                        <img src={item.image_url} className="w-100" alt={item.name} style={{ height: '240px', objectFit: 'cover' }} />
                                         <div className="position-absolute top-0 end-0 m-3 badge bg-dark opacity-75">
                                             {item.category || 'Luxury'}
                                         </div>

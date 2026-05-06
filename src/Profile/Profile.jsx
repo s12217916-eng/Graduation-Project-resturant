@@ -7,6 +7,7 @@ export default function Profile() {
     last_name: '',
     phone_number: '',
     email: '',
+    role: '',
   });
 
   const [loading, setLoading] = useState(true);
@@ -58,6 +59,16 @@ export default function Profile() {
       transform: translateY(-2px);
       box-shadow: 0 10px 20px rgba(253, 126, 20, 0.25);
     }
+    .role-box {
+      background: #fff3e8;
+      border: 1px solid #ffd6b0;
+      border-right: 5px solid #fd7e14;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: bold;
+    }
   `;
 
   useEffect(() => {
@@ -66,11 +77,14 @@ export default function Profile() {
         setLoading(true);
         const data = await getProfile();
 
+        console.log('Profile data:', data);
+
         setFormData({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
           phone_number: data.phone_number || '',
           email: data.email || '',
+          role: data.role || '',
         });
       } catch (error) {
         setErrorMessage('تعذر تحميل بيانات البروفايل');
@@ -128,6 +142,10 @@ export default function Profile() {
           <>
             {message && <div className="alert alert-success text-center">{message}</div>}
             {errorMessage && <div className="alert alert-danger text-center">{errorMessage}</div>}
+
+            <div className="role-box">
+              نوع الحساب: {formData.role || 'غير معروف'}
+            </div>
 
             <form onSubmit={handleSubmit} className="row g-3">
               <div className="col-md-6">

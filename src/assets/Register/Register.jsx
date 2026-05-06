@@ -232,7 +232,7 @@ const getTokenFromRegisterResponse = (data) => {
 
       await addOwnerLicense(token);
 
-      navigate('/login');
+      navigate('/dashboard');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {

@@ -31,7 +31,7 @@ export default function SavedRestaurants() {
       }
 
       const response = await axios.get(
-        'http://revvo-server.onrender.com/api/user/saved/',
+        'https://revvo-server.onrender.com/api/user/saved/',
         {
           headers: {
             Authorization: `Bearer ${token}`,
