@@ -1,9 +1,8 @@
+// Register.jsx
+
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
 import { registerUser } from '../../services/authService';
-
-const FIXED_RESTAURANT_ID = '24efd7fc-96f8-4259-8258-839b35e52bb9';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -22,11 +21,6 @@ export default function Register() {
     phone_number: '',
     password: '',
     location: '',
-
-    license_number: '',
-    license_expiry: '',
-    license_image: null,
-    id_image: null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -34,113 +28,96 @@ export default function Register() {
 
   const customStyles = `
     .reg-section {
-      background: linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)), url('/hero2.jpg');
+      background:
+        linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,.75)),
+        url('/hero2.jpg');
+
       background-size: cover;
       background-position: center;
       min-height: 100vh;
+
       display: flex;
       align-items: center;
       justify-content: center;
+
       padding: 50px 0;
       direction: rtl;
     }
 
     .reg-card {
       background: rgba(255,255,255,.96);
-      border-radius: 25px;
-      padding: 40px;
-      box-shadow: 0 20px 40px rgba(0,0,0,.4);
+      border-radius: 30px;
+      padding: 45px;
+      box-shadow: 0 25px 50px rgba(0,0,0,.35);
+
       width: 100%;
       max-width: 760px;
     }
 
     .form-control {
-      border-radius: 10px;
-      padding: 12px;
+      border-radius: 14px;
+      padding: 14px;
       border: 1px solid #eee;
       background-color: #f8f9fa;
     }
 
     .form-control:focus {
       border-color: #fd7e14;
-      box-shadow: 0 0 0 .25rem rgba(253,126,20,.15);
-      background-color: #fff;
+      box-shadow: 0 0 0 .2rem rgba(253,126,20,.15);
+      background-color: white;
     }
 
     .btn-reg {
-      background: linear-gradient(135deg, #fd7e14 0%, #ff4d4d 100%);
+      background:
+        linear-gradient(135deg, #fd7e14 0%, #ff4d4d 100%);
+
       border: none;
       color: white;
       font-weight: bold;
-      padding: 14px;
+
+      padding: 15px;
       border-radius: 50px;
+
       transition: .3s;
+      font-size: 17px;
     }
 
     .btn-reg:hover {
       transform: translateY(-3px);
-      box-shadow: 0 10px 20px rgba(253,126,20,.3);
+      box-shadow: 0 15px 25px rgba(253,126,20,.3);
       color: white;
     }
 
     .role-badge {
       display: inline-block;
+
       background: ${isOwner ? '#212529' : '#fd7e14'};
+
       color: white;
-      padding: 8px 18px;
+
+      padding: 10px 22px;
       border-radius: 50px;
+
       font-size: 14px;
       font-weight: bold;
-      margin-top: 8px;
-    }
 
-    .section-title {
-      background: #fff3e8;
-      border-right: 4px solid #fd7e14;
-      padding: 10px 15px;
-      border-radius: 10px;
-      font-weight: bold;
-      margin: 20px 0 10px;
+      margin-top: 10px;
     }
   `;
 
   const handleChange = (e) => {
-    const { name, value, files, type } = e.target;
+    const { name, value } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'file' ? files[0] : value,
+      [name]: value,
     }));
   };
 
-  const validateOwnerFields = () => {
-    if (!isOwner) return true;
-
-    if (
-      !formData.license_number ||
-      !formData.license_expiry ||
-      !formData.license_image ||
-      !formData.id_image
-    ) {
-      setErrorMessage('يرجى تعبئة جميع بيانات الرخصة ورفع الصور المطلوبة');
-      return false;
-    }
-
-    return true;
-  };
-
-const getTokenFromRegisterResponse = (data) => {
-  return (
-    data?.tokens?.access ||
-    data?.access ||
-    data?.access_token ||
-    data?.token
-  );
-};
   const getErrorMessage = (error) => {
     const data = error?.response?.data;
 
-    let message = 'فشل إنشاء الحساب، تأكد من البيانات';
+    let message = 'فشل إنشاء الحساب';
 
     if (typeof data === 'string') {
       message = data;
@@ -148,45 +125,14 @@ const getTokenFromRegisterResponse = (data) => {
       message = data.detail;
     } else if (data?.message) {
       message = data.message;
-    } else if (typeof data === 'object' && data !== null) {
-      const firstKey = Object.keys(data)[0];
-
-      if (firstKey) {
-        const firstError = data[firstKey];
-        message = Array.isArray(firstError) ? firstError[0] : firstError;
-      }
     }
 
     return message;
   };
 
-  const addOwnerLicense = async (token) => {
-    const licenseFormData = new FormData();
-
-    licenseFormData.append('license_number', formData.license_number);
-
-    licenseFormData.append(
-      'license_expiry',
-      new Date(formData.license_expiry).toISOString()
-    );
-
-    licenseFormData.append('license_image', formData.license_image);
-    licenseFormData.append('id_image', formData.id_image);
-
-    return axios.post(
-      `https://revvo-server.onrender.com/api/owner/restaurants/${FIXED_RESTAURANT_ID}/license/`,
-      licenseFormData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setErrorMessage('');
 
     if (
@@ -196,48 +142,51 @@ const getTokenFromRegisterResponse = (data) => {
       !formData.phone_number ||
       !formData.password
     ) {
-      setErrorMessage('يرجى تعبئة جميع الحقول المطلوبة');
+      setErrorMessage('يرجى تعبئة جميع الحقول');
       return;
     }
-
-    if (!validateOwnerFields()) return;
 
     try {
       setLoading(true);
 
- const payload = {
-  first_name: formData.first_name,
-  last_name: formData.last_name,
-  email: formData.email,
-  password: formData.password,
-  phone_number: formData.phone_number,
-  role: isOwner ? 'OWNER' : 'CLIENT',
-};
+      const payload = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        password: formData.password,
+        phone_number: formData.phone_number,
+        role: isOwner ? 'OWNER' : 'CLIENT',
+      };
 
-      const registerResponse = await registerUser(payload);
+      const response = await registerUser(payload);
 
-      if (!isOwner) {
-        navigate('/login');
-        return;
-      }
+console.log(response);
 
-      const token = getTokenFromRegisterResponse(registerResponse);
+const access =
+  response?.access ||
+  response?.tokens?.access;
 
-      if (!token) {
-        setErrorMessage('تم إنشاء الحساب لكن لم يتم استلام التوكن');
-        return;
-      }
+const refresh =
+  response?.refresh ||
+  response?.tokens?.refresh;
 
-      localStorage.setItem('token', token);
+if (access) {
+  localStorage.setItem('token', access);
+}
 
-      await addOwnerLicense(token);
+if (refresh) {
+  localStorage.setItem('refresh', refresh);
+}
 
-      navigate('/dashboard');
+if (isOwner) {
+  navigate('/dashboard');
+} else {
+  navigate('/login');
+}
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
-      setLoading(false)
-      console.log(registerResponse.user.role);
+      setLoading(false);
     }
   };
 
@@ -246,19 +195,23 @@ const getTokenFromRegisterResponse = (data) => {
       <style>{customStyles}</style>
 
       <div className="reg-card mx-3">
-        <div className="text-center mb-4">
-          <h2 className="fw-bold">
-            {isOwner ? 'تسجيل مالك مطعم' : 'تسجيل مستخدم عادي'}
+        <div className="text-center mb-5">
+          <h2 className="fw-bold display-6">
+            {isOwner
+              ? 'تسجيل مالك مطعم'
+              : 'إنشاء حساب جديد'}
           </h2>
 
           <span className="role-badge">
-            {isOwner ? 'Owner' : 'Client'}
+            {isOwner
+              ? 'Restaurant Owner'
+              : 'Client'}
           </span>
 
           <p className="text-muted mt-3 mb-0">
             {isOwner
-              ? 'أدخل بياناتك وبيانات الرخصة للتحقق من الحساب'
-              : 'أنشئ حسابك واحجز من أفضل المطاعم'}
+              ? 'أنشئ حسابك وابدأ بإدارة مطعمك بالكامل'
+              : 'اكتشف أفضل المطاعم واحجز بسهولة'}
           </p>
         </div>
 
@@ -268,11 +221,15 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
         )}
 
-        <form className="row g-3" onSubmit={handleSubmit}>
-          <div className="section-title">بيانات الحساب</div>
-
+        <form
+          className="row g-3"
+          onSubmit={handleSubmit}
+        >
           <div className="col-md-6">
-            <label className="form-label small fw-bold">الاسم الأول</label>
+            <label className="form-label fw-bold">
+              الاسم الأول
+            </label>
+
             <input
               type="text"
               name="first_name"
@@ -284,7 +241,10 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
 
           <div className="col-md-6">
-            <label className="form-label small fw-bold">الاسم الأخير</label>
+            <label className="form-label fw-bold">
+              الاسم الأخير
+            </label>
+
             <input
               type="text"
               name="last_name"
@@ -296,7 +256,10 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
 
           <div className="col-md-12">
-            <label className="form-label small fw-bold">البريد الإلكتروني</label>
+            <label className="form-label fw-bold">
+              البريد الإلكتروني
+            </label>
+
             <input
               type="email"
               name="email"
@@ -308,7 +271,10 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
 
           <div className="col-md-6">
-            <label className="form-label small fw-bold">رقم الهاتف</label>
+            <label className="form-label fw-bold">
+              رقم الهاتف
+            </label>
+
             <input
               type="tel"
               name="phone_number"
@@ -320,7 +286,10 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
 
           <div className="col-md-6">
-            <label className="form-label small fw-bold">الموقع</label>
+            <label className="form-label fw-bold">
+              الموقع
+            </label>
+
             <input
               type="text"
               name="location"
@@ -332,7 +301,10 @@ const getTokenFromRegisterResponse = (data) => {
           </div>
 
           <div className="col-md-12">
-            <label className="form-label small fw-bold">كلمة المرور</label>
+            <label className="form-label fw-bold">
+              كلمة المرور
+            </label>
+
             <input
               type="password"
               name="password"
@@ -343,87 +315,24 @@ const getTokenFromRegisterResponse = (data) => {
             />
           </div>
 
-          {isOwner && (
-            <>
-              <div className="section-title">بيانات الرخصة</div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">رقم الرخصة</label>
-                <input
-                  type="number"
-                  name="license_number"
-                  className="form-control"
-                  value={formData.license_number}
-                  onChange={handleChange}
-                  placeholder="123456789"
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">
-                  تاريخ انتهاء الرخصة
-                </label>
-                <input
-                  type="date"
-                  name="license_expiry"
-                  className="form-control"
-                  value={formData.license_expiry}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">صورة الرخصة</label>
-                <input
-                  type="file"
-                  name="license_image"
-                  className="form-control"
-                  accept="image/*"
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label small fw-bold">صورة الهوية</label>
-                <input
-                  type="file"
-                  name="id_image"
-                  className="form-control"
-                  accept="image/*"
-                  onChange={handleChange}
-                />
-              </div>
-            </>
-          )}
-
           <div className="col-md-12 mt-4">
             <button
-              className="btn btn-reg w-100 shadow-sm"
+              className="btn btn-reg w-100"
               type="submit"
               disabled={loading}
             >
               {loading
                 ? 'جاري إنشاء الحساب...'
                 : isOwner
-                ? 'إرسال طلب تسجيل مالك مطعم'
-                : 'إنشاء حساب مستخدم عادي'}
+                ? 'إنشاء حساب مالك مطعم'
+                : 'إنشاء الحساب'}
             </button>
           </div>
 
           <div className="text-center mt-3">
             <p className="small">
-              تريد تغيير نوع الحساب؟
-              <button
-                type="button"
-                className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"
-                onClick={() => navigate('/registerchoice', { replace: true })}
-              >
-                رجوع للاختيار
-              </button>
-            </p>
-
-            <p className="small">
               لديك حساب بالفعل؟
+
               <button
                 type="button"
                 className="btn btn-link text-warning fw-bold p-0 ms-1 text-decoration-none"

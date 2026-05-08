@@ -69,8 +69,35 @@ export default function Login() {
 
         try {
             setLoading(true);
-            await loginUser(formData);
-            navigate('/');
+            const response = await loginUser(formData);
+
+console.log(response);
+
+const access =
+  response?.access ||
+  response?.tokens?.access;
+
+const refresh =
+  response?.refresh ||
+  response?.tokens?.refresh;
+
+if (access) {
+  localStorage.setItem('token', access);
+}
+
+if (refresh) {
+  localStorage.setItem('refresh', refresh);
+}
+
+const role =
+  response?.user?.role ||
+  response?.role;
+
+if (role === 'OWNER') {
+  navigate('/dashboard');
+} else {
+  navigate('/');
+}
         }  catch (error) {
     console.error(error);
 
