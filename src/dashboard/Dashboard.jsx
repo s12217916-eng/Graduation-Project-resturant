@@ -131,6 +131,14 @@ export default function Dashboard() {
   const [reservationsLoaded, setReservationsLoaded] = useState(false);
   const [reservationsLoading, setReservationsLoading] = useState(false);
 
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  const [restaurantStatus, setRestaurantStatus] = useState(null); // null | 'published' | 'unpublished'
+  const [statusLoaded, setStatusLoaded] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+
   // ── section navigation: lazy-load on first visit ──
   const handleNav = async (key) => {
     setActiveSection(key);
@@ -141,6 +149,8 @@ export default function Dashboard() {
     if (key === 'menu'         && !menuLoaded)         fetchMenu();
     if (key === 'images'       && !imagesLoaded)       fetchImages();
     if (key === 'reservations' && !reservationsLoaded) fetchReservations();
+    if (key === 'reviews'      && !reviewsLoaded)      fetchReviews();
+    if (key === 'status'       && !statusLoaded)       fetchStatus();
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -232,7 +242,7 @@ export default function Dashboard() {
   const fetchHours = async () => {
     setHoursLoading(true);
     try {
-      const res = await axios.get(`${API}/restaurant/hours/`, { headers: authHeader() });
+      const res = await axios.get(`${API}/owner/restaurant/hours/`, { headers: authHeader() });
       const data = Array.isArray(res.data) ? res.data : res.data.days;
       if (data && data.length > 0) {
         setWorkingHours(data.map(d => ({
@@ -306,7 +316,13 @@ export default function Dashboard() {
 
   const saveCapacity = async () => {
     try {
-      await axios.post(`${API}/owner/restaurant/capacity/`, capacityData, { headers: authHeader() });
+      const payload = {
+        max_capacity:  capacityData.max_capacity,
+        slot_duration: capacityData.slot_duration,
+        max_party_size: capacityData.max_party_size,
+        auto_confirm:  capacityData.auto_confirm,
+      };
+      await axios.post(`${API}/owner/restaurant/capacity/`, payload, { headers: authHeader() });
       toast('تم حفظ إعدادات السعة بنجاح');
       setCapacityDirty(false);
     } catch { toast('فشل حفظ إعدادات السعة', 'error'); }
@@ -318,7 +334,7 @@ export default function Dashboard() {
   const fetchMenu = async () => {
     setMenuLoading(true);
     try {
-      const res = await axios.get(`${API}/restaurant/menu/`);
+      const res = await axios.get(`${API}/owner/restaurant/menu/`, { headers: authHeader() });
       setMenuItems(res.data);
       setMenuLoaded(true);
     } catch { toast('فشل جلب المينيو', 'error'); }
@@ -360,7 +376,7 @@ export default function Dashboard() {
   const fetchImages = async () => {
     setImagesLoading(true);
     try {
-      const res = await axios.get(`${API}/restaurant/images/`, { headers: authHeader() });
+      const res = await axios.get(`${API}/owner/restaurant/images/`, { headers: authHeader() });
       setRestaurantImages(res.data);
       setImagesLoaded(true);
     } catch { toast('فشل جلب الصور', 'error'); }
@@ -416,7 +432,7 @@ export default function Dashboard() {
     if (!rejectReason.trim()) { toast('يرجى ذكر سبب الرفض', 'warning'); return; }
     try {
       await axios.post(
-        `${API}/restaurant/reservations/${selectedResId}/reject/`,
+        `${API}/owner/restaurant/reservations/${selectedResId}/reject/`,
         { reason: rejectReason },
         { headers: authHeader() }
       );
@@ -429,6 +445,49 @@ export default function Dashboard() {
   // ═══════════════════════════════════════════════════════════
   // SIDEBAR
   // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  // REVIEWS
+  // ═══════════════════════════════════════════════════════════
+  const fetchReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      const res = await axios.get(`${API}/owner/restaurant/reviews`, { headers: authHeader() });
+      setReviews(res.data);
+      setReviewsLoaded(true);
+    } catch { toast('فشل جلب التقييمات', 'error'); }
+    setReviewsLoading(false);
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // STATUS & PUBLISH
+  // ═══════════════════════════════════════════════════════════
+  const fetchStatus = async () => {
+    setStatusLoading(true);
+    try {
+      const res = await axios.get(`${API}/owner/restaurant/status/`, { headers: authHeader() });
+      setRestaurantStatus(res.data);
+      setStatusLoaded(true);
+    } catch { toast('فشل جلب حالة المطعم', 'error'); }
+    setStatusLoading(false);
+  };
+
+  const publishRestaurant = async () => {
+    try {
+      await axios.post(`${API}/owner/restaurant/publish/`, {}, { headers: authHeader() });
+      toast('تم نشر المطعم بنجاح ✅');
+      fetchStatus();
+    } catch { toast('فشل نشر المطعم', 'error'); }
+  };
+
+  const unpublishRestaurant = async () => {
+    try {
+      await axios.post(`${API}/owner/restaurant/unpublish/`, {}, { headers: authHeader() });
+      toast('تم إلغاء نشر المطعم');
+      fetchStatus();
+    } catch { toast('فشل إلغاء النشر', 'error'); }
+  };
+
+  // ── SIDEBAR ──
   const sidebarItems = [
     { key: 'overview',      label: 'نظرة عامة',      icon: '🏠' },
     { key: 'restaurant',    label: 'معلومات المطعم', icon: '🍽️', dirty: restaurantDirty },
@@ -438,6 +497,8 @@ export default function Dashboard() {
     { key: 'license',       label: 'الرخصة',         icon: '📄', dirty: licenseDirty },
     { key: 'images',        label: 'صور المطعم',     icon: '🖼️' },
     { key: 'menu',          label: 'المينيو',         icon: '📋' },
+    
+    { key: 'status',        label: 'النشر والحالة',  icon: '📡' },
     { key: 'analytics',     label: 'التحليلات',      icon: '📊' },
     { key: 'ai',            label: 'AI Summary',     icon: '🤖' },
   ];
@@ -901,6 +962,106 @@ export default function Dashboard() {
             </div>
           </div>
         );
+
+      // ── REVIEWS ────────────────────────────────────────────
+      case 'reviews':
+        if (reviewsLoading) return <Spinner />;
+        return (
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <h3 style={styles.cardTitle}>⭐ تقييمات العملاء</h3>
+              <button style={styles.btnOutline} onClick={fetchReviews}>تحديث 🔄</button>
+            </div>
+            {reviews.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#9ca3af', padding: 60, fontSize: 15 }}>
+                لا توجد تقييمات حتى الآن
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {reviews.map((r, i) => (
+                  <div key={r.id || i} style={{
+                    border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px',
+                    background: '#fafafa'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
+                        {r.user_name || r.user || 'مجهول'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        {[1,2,3,4,5].map(s => (
+                          <span key={s} style={{ fontSize: 16, color: s <= (r.rating || r.stars || 0) ? '#f59e0b' : '#d1d5db' }}>★</span>
+                        ))}
+                      </div>
+                    </div>
+                    {r.comment && (
+                      <p style={{ margin: 0, color: '#6b7280', fontSize: 14, lineHeight: 1.6 }}>{r.comment}</p>
+                    )}
+                    {r.created_at && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+                        {new Date(r.created_at).toLocaleDateString('ar-EG')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      // ── STATUS & PUBLISH ────────────────────────────────────
+      case 'status': {
+        if (statusLoading) return <Spinner />;
+        const isPublished = restaurantStatus?.is_published ?? restaurantStatus?.status === 'published';
+        return (
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <h3 style={styles.cardTitle}>📡 النشر وحالة المطعم</h3>
+              <button style={styles.btnOutline} onClick={fetchStatus}>تحديث 🔄</button>
+            </div>
+
+            {/* Status card */}
+            <div style={{
+              borderRadius: 16, padding: 28, marginBottom: 24, textAlign: 'center',
+              background: isPublished ? '#f0fdf4' : '#fff5f5',
+              border: `2px solid ${isPublished ? '#86efac' : '#fca5a5'}`
+            }}>
+              <div style={{ fontSize: 52, marginBottom: 12 }}>{isPublished ? '🟢' : '🔴'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: isPublished ? '#166534' : '#991b1b', marginBottom: 6 }}>
+                {isPublished ? 'المطعم منشور' : 'المطعم غير منشور'}
+              </div>
+              <div style={{ fontSize: 14, color: '#6b7280' }}>
+                {isPublished
+                  ? 'مطعمك ظاهر للعملاء ويمكنهم إجراء حجوزات'
+                  : 'مطعمك مخفي عن العملاء حالياً'}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center' }}>
+              {!isPublished && (
+                <button style={{ ...styles.btnSuccess, padding: '13px 32px', fontSize: 15 }} onClick={publishRestaurant}>
+                  🚀 نشر المطعم
+                </button>
+              )}
+              {isPublished && (
+                <button style={{ ...styles.btnDanger, padding: '13px 32px', fontSize: 15 }} onClick={unpublishRestaurant}>
+                  ⏸️ إلغاء النشر
+                </button>
+              )}
+            </div>
+
+            {/* Raw status data if available */}
+            {restaurantStatus && (
+              <div style={{ marginTop: 24, padding: 16, background: '#f9fafb', borderRadius: 12 }}>
+                <div style={{ fontSize: 12, color: '#9ca3af', fontWeight: 700, marginBottom: 8 }}>بيانات الحالة</div>
+                <pre style={{ margin: 0, fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', direction: 'ltr' }}>
+                  {JSON.stringify(restaurantStatus, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      }
 
       // ── ANALYTICS ──────────────────────────────────────────
       case 'analytics':
