@@ -5,8 +5,14 @@ import React, { useState, useCallback, useRef } from 'react';
 const API = 'https://revvo-server.onrender.com/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-const token = () => localStorage.getItem('access');
-const authHeader = () => ({ Authorization: `Bearer ${token()}` });
+const token = () =>
+  localStorage.getItem('access') ||
+  localStorage.getItem('token');
+
+const authHeader = () => {
+  const t = token();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 
 // Toast notification component
 function Toast({ toasts, removeToast }) {
@@ -178,16 +184,31 @@ export default function Dashboard() {
     setRestaurantDirty(true);
   };
 
-  const updateRestaurant = async () => {
-    try {
-      const formData = new FormData();
-      Object.entries(restaurantData).forEach(([k, v]) => { if (v !== null) formData.append(k, v); });
-      await axios.put(`${API}/owner/restaurant/`, formData, { headers: authHeader() });
-      toast('تم تحديث بيانات المطعم بنجاح');
-      setRestaurantDirty(false);
-    } catch { toast('فشل تحديث بيانات المطعم', 'error'); }
-  };
+const updateRestaurant = async () => {
+  try {
+    const payload = {
+      name: restaurantData.name || '',
+      about: restaurantData.about || '',
+      category: restaurantData.category || '',
+      address: restaurantData.address || '',
+      phone_number: restaurantData.phone_number || '',
+      website: restaurantData.website?.trim() ? restaurantData.website.trim() : null,
+    };
 
+    await axios.put(`${API}/owner/restaurant/`, payload, {
+      headers: {
+        ...authHeader(),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    toast('تم تحديث بيانات المطعم بنجاح ✅');
+    setRestaurantDirty(false);
+  } catch (err) {
+    console.log('UPDATE RESTAURANT ERROR:', err.response?.data || err);
+    toast(err.response?.data?.detail || 'فشل تحديث بيانات المطعم', 'error');
+  }
+};
   // ═══════════════════════════════════════════════════════════
   // LICENSE
   // ═══════════════════════════════════════════════════════════
@@ -314,19 +335,29 @@ export default function Dashboard() {
     setCapacityLoading(false);
   };
 
-  const saveCapacity = async () => {
-    try {
-      const payload = {
-        max_capacity:  capacityData.max_capacity,
-        slot_duration: capacityData.slot_duration,
-        max_party_size: capacityData.max_party_size,
-        auto_confirm:  capacityData.auto_confirm,
-      };
-      await axios.post(`${API}/owner/restaurant/capacity/`, payload, { headers: authHeader() });
-      toast('تم حفظ إعدادات السعة بنجاح');
-      setCapacityDirty(false);
-    } catch { toast('فشل حفظ إعدادات السعة', 'error'); }
-  };
+ const saveCapacity = async () => {
+  try {
+    const payload = {
+      max_capacity: Number(capacityData.max_capacity),
+      slot_duration: Number(capacityData.slot_duration),
+      max_party_size: Number(capacityData.max_party_size),
+      auto_confirm: Boolean(capacityData.auto_confirm),
+    };
+
+    await axios.put(`${API}/owner/restaurant/capacity/`, payload, {
+      headers: {
+        ...authHeader(),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    toast('تم حفظ إعدادات السعة بنجاح');
+    setCapacityDirty(false);
+  } catch (err) {
+    console.log('CAPACITY ERROR:', err.response?.data);
+    toast(err.response?.data?.detail || 'فشل حفظ إعدادات السعة', 'error');
+  }
+};
 
   // ═══════════════════════════════════════════════════════════
   // MENU
@@ -373,30 +404,74 @@ export default function Dashboard() {
   // ═══════════════════════════════════════════════════════════
   // IMAGES
   // ═══════════════════════════════════════════════════════════
-  const fetchImages = async () => {
-    setImagesLoading(true);
-    try {
-      const res = await axios.get(`${API}/owner/restaurant/images/`, { headers: authHeader() });
-      setRestaurantImages(res.data);
-      setImagesLoaded(true);
-    } catch { toast('فشل جلب الصور', 'error'); }
-    setImagesLoading(false);
-  };
+const IMAGE_UPLOAD_URL = `${API}/owner/restaurant/images/bulk`; // بدون /
+const IMAGE_LIST_URL = `${API}/owner/restaurant/images`;       // مع /
 
-  const uploadImages = async () => {
-    if (selectedFiles.length === 0) { toast('الرجاء اختيار صور أولاً', 'warning'); return; }
-    try {
-      const formData = new FormData();
-      selectedFiles.forEach(f => formData.append('images', f));
-      await axios.post(`${API}/owner/restaurant/images/bulk`, formData, { headers: authHeader() });
-      toast('تم رفع الصور بنجاح');
-      setSelectedFiles([]);
-      fetchImages();
-    } catch (err) {
-      const msg = err.response?.data?.images ? 'خطأ في صيغة الصور' : 'فشل رفع الصور';
-      toast(msg, 'error');
+const fixImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `https://revvo-server.onrender.com${url}`;
+};
+
+const normalizeImages = (data) => {
+  const list = Array.isArray(data)
+    ? data
+    : data?.images || data?.results || data?.data || [];
+
+  return list.map((img, index) => ({
+    id: img.id || img.image_id || index,
+    image: fixImageUrl(img.image || img.url || img.file || img.path),
+  }));
+};
+
+const fetchImages = async () => {
+  setImagesLoading(true);
+  try {
+    const res = await axios.get(IMAGE_LIST_URL, {
+      headers: authHeader(),
+    });
+
+    setRestaurantImages(normalizeImages(res.data));
+    setImagesLoaded(true);
+  } catch (err) {
+    console.log('FETCH IMAGES ERROR:', err.response?.data || err);
+    toast(err.response?.data?.detail || 'فشل جلب الصور', 'error');
+  } finally {
+    setImagesLoading(false);
+  }
+};
+
+const uploadImages = async () => {
+  if (selectedFiles.length === 0) {
+    toast('الرجاء اختيار صور أولاً', 'warning');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+
+    selectedFiles.forEach(file => {
+      formData.append('images', file);
+    });
+
+    await axios.post(IMAGE_UPLOAD_URL, formData, {
+      headers: authHeader(),
+    });
+
+    toast('تم رفع الصور بنجاح');
+    setSelectedFiles([]);
+    await fetchImages();
+  } catch (err) {
+    console.log('UPLOAD IMAGES ERROR:', err.response?.data || err);
+
+    if (err.response?.status === 401) {
+      toast('انتهت الجلسة، اعمل تسجيل دخول من جديد', 'error');
+      return;
     }
-  };
+
+    toast(err.response?.data?.detail || 'فشل رفع الصور', 'error');
+  }
+};
 
   const deleteImage = async (id) => {
     if (!window.confirm('هل أنت متأكد من حذف هذه الصورة؟')) return;
@@ -461,31 +536,85 @@ export default function Dashboard() {
   // ═══════════════════════════════════════════════════════════
   // STATUS & PUBLISH
   // ═══════════════════════════════════════════════════════════
-  const fetchStatus = async () => {
-    setStatusLoading(true);
-    try {
-      const res = await axios.get(`${API}/owner/restaurant/status/`, { headers: authHeader() });
-      setRestaurantStatus(res.data);
-      setStatusLoaded(true);
-    } catch { toast('فشل جلب حالة المطعم', 'error'); }
-    setStatusLoading(false);
-  };
+ const fetchStatus = async () => {
+  setStatusLoading(true);
+  try {
+    const res = await axios.get(`${API}/owner/restaurant/status/`, {
+      headers: authHeader()
+    });
 
-  const publishRestaurant = async () => {
-    try {
-      await axios.post(`${API}/owner/restaurant/publish/`, {}, { headers: authHeader() });
-      toast('تم نشر المطعم بنجاح ✅');
-      fetchStatus();
-    } catch { toast('فشل نشر المطعم', 'error'); }
-  };
+    const statusValue =
+      res.data?.status ||
+      (res.data?.is_published ? 'published' : 'unpublished');
+
+    setRestaurantStatus({
+      ...res.data,
+      status: statusValue
+    });
+
+    setStatusLoaded(true);
+  } catch (err) {
+    toast(err.response?.data?.detail || 'فشل جلب حالة المطعم', 'error');
+  } finally {
+    setStatusLoading(false);
+  }
+};
+
+ const publishRestaurant = async () => {
+  if (!window.confirm('هل أنت متأكد من نشر المطعم؟')) return;
+
+  try {
+   await axios.post(
+  `${API}/owner/restaurant/publish/`,
+  null,
+  {
+    headers: {
+      ...authHeader(),
+      'Content-Type': 'application/json',
+    }
+  }
+);
+
+    toast('تم نشر المطعم بنجاح ✅');
+    setRestaurantStatus(prev => ({
+      ...(prev || {}),
+      status: 'published',
+      is_published: true
+    }));
+    setStatusLoaded(false);
+    fetchStatus();
+  } catch (err) {
+    toast(err.response?.data?.detail || 'فشل نشر المطعم', 'error');
+  }
+};
 
   const unpublishRestaurant = async () => {
-    try {
-      await axios.post(`${API}/owner/restaurant/unpublish/`, {}, { headers: authHeader() });
-      toast('تم إلغاء نشر المطعم');
-      fetchStatus();
-    } catch { toast('فشل إلغاء النشر', 'error'); }
-  };
+  if (!window.confirm('هل أنت متأكد من إلغاء نشر المطعم؟')) return;
+
+  try {
+  await axios.post(
+  `${API}/owner/restaurant/unpublish/`,
+  null,
+  {
+    headers: {
+      ...authHeader(),
+      'Content-Type': 'application/json',
+    }
+  }
+);
+
+    toast('تم إلغاء نشر المطعم');
+    setRestaurantStatus(prev => ({
+      ...(prev || {}),
+      status: 'unpublished',
+      is_published: false
+    }));
+    setStatusLoaded(false);
+    fetchStatus();
+  } catch (err) {
+    toast(err.response?.data?.detail || 'فشل إلغاء النشر', 'error');
+  }
+};
 
   // ── SIDEBAR ──
   const sidebarItems = [
@@ -858,8 +987,15 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
                 {restaurantImages.map(img => (
                   <div key={img.id} style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                    <img src={img.image} alt="Restaurant" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
-                    <button onClick={() => deleteImage(img.id)} style={{
+                    <img
+  src={img.image}
+  alt="Restaurant"
+  style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
+  onError={(e) => {
+    e.currentTarget.style.display = 'none';
+  }}
+/>
+  <button onClick={() => deleteImage(img.id)} style={{
                       position: 'absolute', top: 8, right: 8,
                       background: 'rgba(239,68,68,0.9)', color: '#fff', border: 'none',
                       borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700
@@ -1011,7 +1147,7 @@ export default function Dashboard() {
       // ── STATUS & PUBLISH ────────────────────────────────────
       case 'status': {
         if (statusLoading) return <Spinner />;
-        const isPublished = restaurantStatus?.is_published ?? restaurantStatus?.status === 'published';
+        const isPublished = restaurantStatus?.status === 'published';
         return (
           <div style={styles.card}>
             <div style={styles.cardHeader}>
