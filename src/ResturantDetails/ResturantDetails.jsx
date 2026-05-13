@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import axios from 'axios';
 import {
+  FaHeart,
+  FaRegHeart,
   FaMapMarkerAlt,
   FaStar,
   FaUtensils,
@@ -12,11 +13,14 @@ import {
   FaCompass,
   FaImage,
   FaPhone,
+  FaThumbsUp,
 } from 'react-icons/fa';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+const API = 'https://revvo-server.onrender.com/api';
 
 const DefaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
@@ -26,6 +30,9 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+const getAccess = () =>
+  localStorage.getItem('access') || localStorage.getItem('token');
 
 export default function ResturantDetails() {
   const { id } = useParams();
@@ -39,6 +46,10 @@ export default function ResturantDetails() {
   const [subImages, setSubImages] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [usefulReviews, setUsefulReviews] = useState([]);
+
   const [reviewForm, setReviewForm] = useState({
     comment: '',
     food_rate: 0,
@@ -49,50 +60,108 @@ export default function ResturantDetails() {
 
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState('');
-const [isSaved, setIsSaved] = useState(false);
-const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    const fetchRestaurantData = async () => {
-      setLoading(true);
 
-      try {
-        const baseUrl = `https://revvo-server.onrender.com/api/restaurants/${id}`;
+  const getArray = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return [];
+  };
 
-        const [resDetails, resMenu, resReviews, resDays, resImages] =
-          await Promise.all([
-            axios.get(baseUrl),
-            axios.get(`${baseUrl}/menu/`),
-            axios.get(`${baseUrl}/reviews/`),
-            axios.get(`${baseUrl}/days/`),
-            axios.get(`${baseUrl}/images/`),
-          ]);
+  const authHeaders = () => {
+    const access = getAccess();
 
-        const menuData = resMenu.data || [];
-
-        setRestaurant(resDetails.data);
-        setMenu(menuData);
-        setReviews(resReviews.data.results || []);
-        setWorkingDays(resDays.data || []);
-        setSubImages(resImages.data || []);
-
-        if (menuData.length > 0) {
-          setReviewForm((prev) => ({
-            ...prev,
-            menu_id: menuData[0].id,
-          }));
-        }
-      } catch (error) {
-        console.error('Fetch restaurant data error:', error);
-      } finally {
-        setLoading(false);
-      }
+    return {
+      Authorization: `Bearer ${access}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
     };
+  };
 
+  const fetchRestaurantData = async () => {
+    setLoading(true);
+
+    try {
+      const baseUrl = `${API}/restaurants/${id}`;
+
+      const [resDetails, resMenu, resReviews, resDays, resImages] =
+        await Promise.all([
+          axios.get(baseUrl),
+          axios.get(`${baseUrl}/menu/`),
+          axios.get(`${baseUrl}/reviews/`),
+          axios.get(`${baseUrl}/days/`),
+          axios.get(`${baseUrl}/images/`),
+        ]);
+
+      const menuData = getArray(resMenu.data);
+
+      setRestaurant(resDetails.data);
+      setMenu(menuData);
+      setReviews(getArray(resReviews.data));
+      setWorkingDays(getArray(resDays.data));
+      setSubImages(getArray(resImages.data));
+
+      if (menuData.length > 0) {
+        setReviewForm((prev) => ({
+          ...prev,
+          menu_id: menuData[0].id,
+        }));
+      }
+    } catch (error) {
+      console.error('Fetch restaurant data error:', error?.response?.data || error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchClientActions = async () => {
+    const access = getAccess();
+    if (!access) return;
+
+    try {
+      const [resSaves, resUsefuls] = await Promise.allSettled([
+        axios.get(`${API}/client/saves/`, { headers: authHeaders() }),
+        axios.get(`${API}/client/usefuls/`, { headers: authHeaders() }),
+      ]);
+
+      if (resSaves.status === 'fulfilled') {
+        const savesData = getArray(resSaves.value.data);
+
+        const exists = savesData.some((item) => {
+          const restaurantId =
+            item.restaurant?.id ||
+            item.restaurant_id ||
+            item.restaurant ||
+            item.id;
+
+          return String(restaurantId) === String(id);
+        });
+
+        setIsSaved(exists);
+      }
+
+      if (resUsefuls.status === 'fulfilled') {
+        const usefulData = getArray(resUsefuls.value.data);
+
+        const ids = usefulData
+          .map((item) => item.review?.id || item.review_id || item.review || item.id)
+          .filter(Boolean)
+          .map(String);
+
+        setUsefulReviews(ids);
+      }
+    } catch (error) {
+      console.error('Fetch client actions error:', error?.response?.data || error);
+    }
+  };
+
+  useEffect(() => {
     fetchRestaurantData();
+    fetchClientActions();
   }, [id]);
 
   const handleReviewChange = (e) => {
     const { name, value } = e.target;
+
     setReviewForm((prev) => ({
       ...prev,
       [name]: value,
@@ -124,154 +193,178 @@ const [saving, setSaving] = useState(false);
     ));
   };
 
-const handleSubmitReview = async (e) => {
-  e.preventDefault();
-  setReviewError('');
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    setReviewError('');
 
-  const access = localStorage.getItem('access');
+    const access = getAccess();
 
-  if (!access) {
-    setReviewError('يجب تسجيل الدخول أولاً لإضافة تقييم');
-    navigate('/login');
-    return;
-  }
+    if (!access) {
+      setReviewError('يجب تسجيل الدخول أولاً لإضافة تقييم');
+      navigate('/login');
+      return;
+    }
 
-  if (
-    !reviewForm.food_rate ||
-    !reviewForm.service_rate ||
-    !reviewForm.ambiance_rate
-  ) {
-    setReviewError('يرجى تعبئة جميع التقييمات');
-    return;
-  }
+    if (!reviewForm.food_rate || !reviewForm.service_rate || !reviewForm.ambiance_rate) {
+      setReviewError('يرجى تعبئة جميع التقييمات');
+      return;
+    }
 
-  if (!reviewForm.comment.trim()) {
-    setReviewError('يرجى كتابة تعليق');
-    return;
-  }
+    if (!reviewForm.comment.trim()) {
+      setReviewError('يرجى كتابة تعليق');
+      return;
+    }
 
-  if (!reviewForm.menu_id) {
-    setReviewError('يرجى اختيار صنف من القائمة');
-    return;
-  }
+    if (!reviewForm.menu_id) {
+      setReviewError('يرجى اختيار صنف من القائمة');
+      return;
+    }
 
-  const payload = {
-    comment: reviewForm.comment.trim(),
-    food_rate: Number(reviewForm.food_rate),
-    service_rate: Number(reviewForm.service_rate),
-    ambiance_rate: Number(reviewForm.ambiance_rate),
-    menu_id: reviewForm.menu_id,
-  };
+    const payload = {
+      comment: reviewForm.comment.trim(),
+      food_rate: Number(reviewForm.food_rate),
+      service_rate: Number(reviewForm.service_rate),
+      ambiance_rate: Number(reviewForm.ambiance_rate),
+      menu_id: reviewForm.menu_id,
+    };
 
-  console.log('REVIEW HANDLE RUNNING');
-  console.log('REVIEW ACCESS TOKEN =>', access);
-  console.log('REVIEW PAYLOAD =>', payload);
-
-  try {
-    setReviewLoading(true);
-
-    await axios.post(
-      `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${access}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-      }
-    );
-
-    const resReviews = await axios.get(
-      `https://revvo-server.onrender.com/api/restaurants/${id}/reviews/`
-    );
-
-    setReviews(resReviews.data.results || resReviews.data || []);
-
-    setReviewForm((prev) => ({
-      ...prev,
-      comment: '',
-      food_rate: 0,
-      service_rate: 0,
-      ambiance_rate: 0,
-    }));
-
-    setActiveTab('reviews');
-    alert('تم إرسال التقييم بنجاح');
-  } catch (error) {
-    console.error('Create review error:', error?.response?.data || error);
-
-    setReviewError(
-      error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        'فشل إرسال التقييم'
-    );
-  } finally {
-    setReviewLoading(false);
-  }
-};
-const handleSaveRestaurant = async () => {
-  console.log('SAVE CLICKED');
-
-  const access = localStorage.getItem('access');
-
-  console.log('TOKEN =>', access);
-  console.log('RESTAURANT ID =>', id);
-
-  if (!access) {
-    alert('لازم تسجل دخول');
-    navigate('/login');
-    return;
-  }
-
-  try {
-    setSaving(true);
-
-    if (isSaved) {
-      console.log('DELETE REQUEST');
-
-      await axios.delete(
-        `https://revvo-server.onrender.com/api/restaurants/${id}/save/`,
-        {
-          headers: {
-            Authorization: `Bearer ${access}`,
-            Accept: 'application/json',
-          },
-        }
-      );
-
-      setIsSaved(false);
-      alert('تمت الإزالة من المفضلة');
-    } else {
-      console.log('POST REQUEST');
+    try {
+      setReviewLoading(true);
 
       await axios.post(
-        `https://revvo-server.onrender.com/api/restaurants/${id}/save/`,
-        {}, // مهم يضل موجود
-        {
-          headers: {
-            Authorization: `Bearer ${access}`,
-            Accept: 'application/json',
-          },
-        }
+        `${API}/client/restaurants/${id}/reviews/`,
+        payload,
+        { headers: authHeaders() }
       );
 
-      setIsSaved(true);
-      alert('تمت الإضافة للمفضلة');
-    }
-  } catch (error) {
-    console.error('FULL ERROR =>', error);
-    console.error('RESPONSE =>', error?.response?.data);
+      const resReviews = await axios.get(`${API}/restaurants/${id}/reviews/`);
+      setReviews(getArray(resReviews.data));
 
-    alert(
-      error?.response?.data?.detail ||
-      error?.response?.data?.message ||
-      'فشل الحفظ'
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+      setReviewForm((prev) => ({
+        ...prev,
+        comment: '',
+        food_rate: 0,
+        service_rate: 0,
+        ambiance_rate: 0,
+      }));
+
+      setActiveTab('reviews');
+      alert('تم إرسال التقييم بنجاح');
+    } catch (error) {
+      console.error('Create review error:', error?.response?.data || error);
+
+      setReviewError(
+        error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          'فشل إرسال التقييم'
+      );
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleSaveRestaurant = async () => {
+    const access = getAccess();
+
+    if (!access) {
+      alert('لازم تسجل دخول');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      if (isSaved) {
+        await axios.delete(`${API}/client/restaurants/${id}/save/`, {
+          headers: authHeaders(),
+        });
+
+        setIsSaved(false);
+        alert('تمت الإزالة من المفضلة');
+      } else {
+        await axios.post(
+          `${API}/client/restaurants/${id}/save/`,
+          {},
+          { headers: authHeaders() }
+        );
+
+        setIsSaved(true);
+        alert('تمت الإضافة للمفضلة');
+      }
+    } catch (error) {
+      console.error('Save error:', error?.response?.data || error);
+
+      alert(
+        error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          'فشل الحفظ'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleUseful = async (reviewId) => {
+    const access = getAccess();
+
+    if (!access) {
+      alert('لازم تسجل دخول');
+      navigate('/login');
+      return;
+    }
+
+    const reviewIdString = String(reviewId);
+    const isUseful = usefulReviews.includes(reviewIdString);
+
+    try {
+      if (isUseful) {
+        await axios.delete(
+          `${API}/client/restaurants/${id}/reviews/${reviewId}/useful`,
+          { headers: authHeaders() }
+        );
+
+        setUsefulReviews((prev) => prev.filter((x) => x !== reviewIdString));
+      } else {
+        await axios.post(
+          `${API}/client/restaurants/${id}/reviews/${reviewId}/useful`,
+          {},
+          { headers: authHeaders() }
+        );
+
+        setUsefulReviews((prev) => [...prev, reviewIdString]);
+      }
+    } catch (error) {
+      console.error('Useful error:', error?.response?.data || error);
+      alert(error?.response?.data?.detail || 'فشل تحديث مفيد');
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    const access = getAccess();
+
+    if (!access) {
+      navigate('/login');
+      return;
+    }
+
+    if (!window.confirm('هل أنت متأكد من حذف التقييم؟')) return;
+
+    try {
+      await axios.delete(
+        `${API}/client/restaurants/${id}/reviews/${reviewId}`,
+        { headers: authHeaders() }
+      );
+
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      setUsefulReviews((prev) => prev.filter((x) => x !== String(reviewId)));
+      alert('تم حذف التقييم');
+    } catch (error) {
+      console.error('Delete review error:', error?.response?.data || error);
+      alert(error?.response?.data?.detail || 'فشل حذف التقييم');
+    }
+  };
+
   if (loading) {
     return (
       <div className="vh-100 d-flex justify-content-center align-items-center bg-white">
@@ -280,9 +373,18 @@ const handleSaveRestaurant = async () => {
     );
   }
 
-  if (!restaurant) return null;
+  if (!restaurant) {
+    return (
+      <div className="vh-100 d-flex justify-content-center align-items-center bg-white">
+        <h4 className="text-danger">فشل تحميل بيانات المطعم</h4>
+      </div>
+    );
+  }
 
-  const position = [parseFloat(restaurant.lat), parseFloat(restaurant.lon)];
+  const position = [
+    Number(restaurant.lat) || 31.9539,
+    Number(restaurant.lon) || 35.9106,
+  ];
 
   const customStyles = `
     .details-page {
@@ -294,7 +396,7 @@ const handleSaveRestaurant = async () => {
 
     .hero-banner {
       height: 450px;
-      background: url(${restaurant.image}) center/cover;
+      background: url(${restaurant.image || restaurant.image_url || ''}) center/cover;
       position: relative;
       border-radius: 0 0 60px 60px;
     }
@@ -315,6 +417,8 @@ const handleSaveRestaurant = async () => {
       gap: 10px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.05);
       border: 1px solid white;
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .custom-tab {
@@ -391,6 +495,7 @@ const handleSaveRestaurant = async () => {
 
       <div className="hero-banner shadow-lg">
         <div className="hero-overlay"></div>
+
         <div className="container h-100 d-flex flex-column justify-content-between py-5 position-relative">
           <button
             className="btn btn-blur rounded-pill px-4 align-self-start border-0 text-white fw-bold"
@@ -451,25 +556,39 @@ const handleSaveRestaurant = async () => {
 
             {activeTab === 'menu' && (
               <div className="row g-4">
-                {menu.map((item) => (
-                  <div className="col-md-6" key={item.id}>
-                    <div className="menu-item-card shadow-sm">
-                      <img
-                        src={item.image}
-                        className="rounded-4"
-                        style={{ width: '90px', height: '90px', objectFit: 'cover' }}
-                        alt="food"
-                      />
-                      <div className="flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <h6 className="fw-bold m-0">{item.name}</h6>
-                          <span className="text-warning fw-black">{item.price} JOD</span>
+                {menu.length > 0 ? (
+                  menu.map((item) => (
+                    <div className="col-md-6" key={item.id}>
+                      <div className="menu-item-card shadow-sm">
+                        <img
+                          src={item.image || item.image_url}
+                          className="rounded-4"
+                          style={{
+                            width: '90px',
+                            height: '90px',
+                            objectFit: 'cover',
+                          }}
+                          alt="food"
+                        />
+
+                        <div className="flex-grow-1">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <h6 className="fw-bold m-0">{item.name}</h6>
+                            <span className="text-warning fw-black">
+                              {item.price} JOD
+                            </span>
+                          </div>
+
+                          <p className="text-muted small m-0 lh-sm">
+                            {item.ingredients}
+                          </p>
                         </div>
-                        <p className="text-muted small m-0 lh-sm">{item.ingredients}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-muted text-center">لا توجد عناصر قائمة بعد</p>
+                )}
               </div>
             )}
 
@@ -481,11 +600,13 @@ const handleSaveRestaurant = async () => {
                   <button
                     className="btn btn-dark rounded-pill px-4 fw-bold shadow"
                     onClick={() => {
-                      const access = localStorage.getItem('access');
+                      const access = getAccess();
+
                       if (!access) {
                         navigate('/login');
                         return;
                       }
+
                       document
                         .getElementById('review-form')
                         ?.scrollIntoView({ behavior: 'smooth' });
@@ -496,46 +617,72 @@ const handleSaveRestaurant = async () => {
                 </div>
 
                 {reviews.length > 0 ? (
-                  reviews.map((rev) => (
-                    <div
-                      key={rev.id}
-                      className="mb-4 pb-4 border-bottom border-light d-flex gap-4 align-items-start"
-                    >
-                      <div className="flex-grow-1 text-end">
-                        <div className="d-flex justify-content-end align-items-center gap-2 mb-1">
-                          <h6 className="fw-bold m-0">
-                            {rev.user?.first_name || 'مستخدم'}
-                          </h6>
+                  reviews.map((rev) => {
+                    const isUseful = usefulReviews.includes(String(rev.id));
 
-                          <div className="text-warning small">
-                            {[...Array(5)].map((_, i) => (
-                              <FaStar
-                                key={i}
-                                color={
-                                  i < Math.round(rev.overall_rate || 0)
-                                    ? '#ffc107'
-                                    : '#e0e0e0'
-                                }
-                              />
-                            ))}
+                    return (
+                      <div
+                        key={rev.id}
+                        className="mb-4 pb-4 border-bottom border-light d-flex gap-4 align-items-start"
+                      >
+                        <div className="flex-grow-1 text-end">
+                          <div className="d-flex justify-content-end align-items-center gap-2 mb-1">
+                            <h6 className="fw-bold m-0">
+                              {rev.user?.first_name || rev.user?.username || 'مستخدم'}
+                            </h6>
+
+                            <div className="text-warning small">
+                              {[...Array(5)].map((_, i) => (
+                                <FaStar
+                                  key={i}
+                                  color={
+                                    i < Math.round(rev.overall_rate || 0)
+                                      ? '#ffc107'
+                                      : '#e0e0e0'
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <p className="text-secondary mb-2">{rev.comment}</p>
+
+                          <div className="d-flex justify-content-end gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              className={`btn btn-sm rounded-pill fw-bold ${
+                                isUseful ? 'btn-warning' : 'btn-outline-warning'
+                              }`}
+                              onClick={() => handleToggleUseful(rev.id)}
+                            >
+                              <FaThumbsUp className="ms-2" />
+                              {isUseful ? 'مفيد' : 'مفيد؟'}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger rounded-pill fw-bold"
+                              onClick={() => handleDeleteReview(rev.id)}
+                            >
+                              حذف
+                            </button>
                           </div>
                         </div>
 
-                        <p className="text-secondary mb-0">{rev.comment}</p>
+                        <img
+                          src={
+                            rev.user?.image ||
+                            rev.user?.image_url ||
+                            'https://via.placeholder.com/60x60?text=User'
+                          }
+                          className="rounded-circle border-4 border-white shadow-sm"
+                          width="60"
+                          height="60"
+                          alt="avatar"
+                        />
                       </div>
-
-                      <img
-                        src={
-                          rev.user?.image ||
-                          'https://via.placeholder.com/60x60?text=User'
-                        }
-                        className="rounded-circle border-4 border-white shadow-sm"
-                        width="60"
-                        height="60"
-                        alt="avatar"
-                      />
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-muted text-center mb-4">لا توجد تقييمات بعد</p>
                 )}
@@ -573,6 +720,7 @@ const handleSaveRestaurant = async () => {
 
                     <div className="mb-4 text-end">
                       <label className="fw-bold d-block mb-2">اختر صنفًا من القائمة</label>
+
                       <select
                         name="menu_id"
                         className="form-select"
@@ -580,6 +728,7 @@ const handleSaveRestaurant = async () => {
                         onChange={handleReviewChange}
                       >
                         <option value="">اختر صنفًا</option>
+
                         {menu.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name}
@@ -590,6 +739,7 @@ const handleSaveRestaurant = async () => {
 
                     <div className="mb-4 text-end">
                       <label className="fw-bold d-block mb-2">اكتب تعليقك</label>
+
                       <textarea
                         name="comment"
                         className="form-control"
@@ -617,8 +767,13 @@ const handleSaveRestaurant = async () => {
                 <h4 className="fw-black mb-4">اكتشف موقعنا</h4>
 
                 <div className="map-frame mb-5">
-                  <MapContainer center={position} zoom={16} style={{ height: '100%', width: '100%' }}>
+                  <MapContainer
+                    center={position}
+                    zoom={16}
+                    style={{ height: '100%', width: '100%' }}
+                  >
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
                     <Marker position={position}>
                       <Popup>
                         <b>{restaurant.name}</b>
@@ -638,6 +793,7 @@ const handleSaveRestaurant = async () => {
                       <div className="p-3 bg-success-subtle rounded-3 text-success">
                         <FaPhone size={20} />
                       </div>
+
                       <div>
                         <small className="text-muted d-block">رقم الهاتف</small>
                         <span className="fw-bold">{restaurant.phone_number}</span>
@@ -650,6 +806,7 @@ const handleSaveRestaurant = async () => {
                       <div className="p-3 bg-primary-subtle rounded-3 text-primary">
                         <FaCompass size={20} />
                       </div>
+
                       <div>
                         <small className="text-muted d-block">الموقع الدقيق</small>
                         <span className="fw-bold">
@@ -672,21 +829,24 @@ const handleSaveRestaurant = async () => {
                   className="btn-reserve-luxury fs-5 shadow-lg"
                   onClick={() => navigate(`/reservation/${id}`)}
                 >
-                  
                   <FaCalendarCheck className="ms-2" /> تأكيد الحجز فورا
                 </button>
-<button
-  type="button"
-  className={`btn w-100 mt-3 rounded-pill fw-bold py-3 ${
-    isSaved ? 'btn-danger' : 'btn-outline-danger'
-  }`}
-  onClick={handleSaveRestaurant}
-  disabled={saving}
->
-  {isSaved ? <FaHeart className="ms-2" /> : <FaRegHeart className="ms-2" />}
-  {saving ? 'جاري التنفيذ...' : isSaved ? 'إزالة من المفضلة' : 'حفظ المطعم'}
-</button>
-                <p className="text-muted small mt-3 m-0">لا توجد رسوم إضافية على الحجز</p>
+
+                <button
+                  type="button"
+                  className={`btn w-100 mt-3 rounded-pill fw-bold py-3 ${
+                    isSaved ? 'btn-danger' : 'btn-outline-danger'
+                  }`}
+                  onClick={handleSaveRestaurant}
+                  disabled={saving}
+                >
+                  {isSaved ? <FaHeart className="ms-2" /> : <FaRegHeart className="ms-2" />}
+                  {saving ? 'جاري التنفيذ...' : isSaved ? 'إزالة من المفضلة' : 'حفظ المطعم'}
+                </button>
+
+                <p className="text-muted small mt-3 m-0">
+                  لا توجد رسوم إضافية على الحجز
+                </p>
               </div>
 
               <div className="bg-white p-4 rounded-5 shadow-sm border-0">
@@ -696,10 +856,11 @@ const handleSaveRestaurant = async () => {
 
                 {workingDays.map((day, i) => (
                   <div
-                    key={i}
+                    key={day.id || i}
                     className="d-flex justify-content-between py-2 border-bottom border-light-subtle"
                   >
                     <span className="fw-bold text-dark">{day.day}</span>
+
                     <span
                       className={
                         day.is_closed
@@ -720,7 +881,7 @@ const handleSaveRestaurant = async () => {
                   {subImages.slice(0, 4).map((img) => (
                     <div className="col-6" key={img.id}>
                       <img
-                        src={img.image}
+                        src={img.image || img.image_url}
                         className="w-100 rounded-4 shadow-sm"
                         style={{ height: '100px', objectFit: 'cover' }}
                         alt="gallery"
@@ -728,6 +889,10 @@ const handleSaveRestaurant = async () => {
                     </div>
                   ))}
                 </div>
+
+                {subImages.length === 0 && (
+                  <p className="text-muted text-center mb-0">لا توجد صور إضافية</p>
+                )}
               </div>
             </div>
           </div>

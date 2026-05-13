@@ -418,10 +418,17 @@ const normalizeImages = (data) => {
     ? data
     : data?.images || data?.results || data?.data || [];
 
-  return list.map((img, index) => ({
-    id: img.id || img.image_id || index,
-    image: fixImageUrl(img.image || img.url || img.file || img.path),
-  }));
+  return list.map((img, index) => {
+    const imageUrl = fixImageUrl(
+      img.image || img.image_url || img.url || img.file || img.path
+    );
+
+    return {
+      id: img.id || img.image_id || index,
+      image: imageUrl,
+      image_url: imageUrl,
+    };
+  });
 };
 
 const fetchImages = async () => {
@@ -992,7 +999,7 @@ const uploadImages = async () => {
   alt="Restaurant"
   style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
   onError={(e) => {
-    e.currentTarget.style.display = 'none';
+    e.currentTarget.src = 'https://via.placeholder.com/180x160?text=No+Image';
   }}
 />
   <button onClick={() => deleteImage(img.id)} style={{
@@ -1069,7 +1076,7 @@ const uploadImages = async () => {
                     <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={styles.td}>
                         {item.image
-                          ? <img src={item.image} alt={item.name} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
+                          ? <img src={item.image_URL} alt={item.name} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
                           : <div style={{ width: 48, height: 48, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🍽️</div>}
                       </td>
                       <td style={{ ...styles.td, fontWeight: 600 }}>{item.name}</td>

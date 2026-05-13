@@ -21,8 +21,14 @@ export default function Reservation() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const getToken = () =>
+    localStorage.getItem('access') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken');
+
   const forceEnglishDigits = (value) => {
     if (value === null || value === undefined) return '';
+
     return String(value)
       .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
       .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
@@ -30,9 +36,11 @@ export default function Reservation() {
 
   const normalizeTime = (value) => {
     const clean = forceEnglishDigits(value || '').trim();
+
     if (!clean) return '';
     if (/^\d{2}:\d{2}$/.test(clean)) return clean;
     if (/^\d{2}:\d{2}:\d{2}$/.test(clean)) return clean.slice(0, 5);
+
     return clean;
   };
 
@@ -50,8 +58,6 @@ export default function Reservation() {
   };
 
   const extractSlots = (data) => {
-    console.log('AVAILABILITY RAW RESPONSE =>', data);
-
     if (Array.isArray(data)) return data;
 
     if (Array.isArray(data?.available_slots)) return data.available_slots;
@@ -115,6 +121,7 @@ export default function Reservation() {
 
     if (start && end) return `${start} - ${end}`;
     if (start) return start;
+
     return 'وقت متاح';
   };
 
@@ -128,6 +135,7 @@ export default function Reservation() {
 
     setLoadingSlots(true);
     setAvailableSlots([]);
+
     setFormData((prev) => ({
       ...prev,
       start_time: '',
@@ -140,7 +148,7 @@ export default function Reservation() {
         {
           params: {
             date: cleanDate,
-            party_size: String(partySizeValue || 1),
+            party_size: Number(partySizeValue || 1),
           },
           headers: {
             Accept: 'application/json',
@@ -148,8 +156,7 @@ export default function Reservation() {
         }
       );
 
-      const slots = extractSlots(res.data);
-      setAvailableSlots(slots);
+      setAvailableSlots(extractSlots(res.data));
     } catch (error) {
       console.error('Availability error:', error?.response?.data || error);
       setAvailableSlots([]);
@@ -174,7 +181,7 @@ export default function Reservation() {
   const handlePartySizeChange = (value) => {
     setFormData((prev) => ({
       ...prev,
-      party_size: value,
+      party_size: forceEnglishDigits(value),
       start_time: '',
       end_time: '',
     }));
@@ -203,9 +210,9 @@ export default function Reservation() {
   const handleReserve = async (e) => {
     e.preventDefault();
 
-    const accessToken = localStorage.getItem('access');
+    const token = getToken();
 
-    if (!accessToken) {
+    if (!token) {
       Swal.fire('تنبيه', 'يجب تسجيل الدخول أولاً', 'warning');
       navigate('/login');
       return;
@@ -225,21 +232,19 @@ export default function Reservation() {
       date: forceEnglishDigits(formData.date),
       start_time: normalizeTime(formData.start_time),
       end_time: normalizeTime(formData.end_time),
-      party_size: String(formData.party_size),
-      notes: formData.notes?.trim() || 'test',
+      party_size: Number(formData.party_size),
+      notes: formData.notes?.trim() || '',
     };
-
-    console.log('RESERVATION PAYLOAD =>', payload);
 
     setSubmitting(true);
 
     try {
       await axios.post(
-        `${API_BASE}/restaurants/${id}/reservations/`,
+        `${API_BASE}/client/restaurants/${id}/reservations/`,
         payload,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
@@ -252,6 +257,7 @@ export default function Reservation() {
       console.error('Reservation error:', error?.response?.data || error);
 
       const data = error?.response?.data;
+
       const msg =
         data?.detail ||
         data?.message ||
@@ -271,7 +277,11 @@ export default function Reservation() {
   return (
     <div
       className="container py-5"
-      style={{ direction: 'rtl', textAlign: 'right', fontFamily: 'Cairo, sans-serif' }}
+      style={{
+        direction: 'rtl',
+        textAlign: 'right',
+        fontFamily: 'Cairo, sans-serif',
+      }}
     >
       <div className="card shadow-lg p-4 border-0 rounded-4 bg-white">
         <h2 className="text-center mb-4 fw-bold text-dark border-bottom pb-3">
@@ -282,20 +292,21 @@ export default function Reservation() {
           <div className="row g-4">
             <div className="col-md-6">
               <label className="fw-bold mb-2">تاريخ الحجز</label>
-             <div dir="ltr">
- <input
-  type="date"
-  className="form-control date-input-fixed"
-  value={formData.date}
-  onChange={(e) => handleDateChange(e.target.value)}
-  required
-  data-placeholder="اختر تاريخ الحجز"
-/>
-</div>
+
+              <div dir="ltr">
+                <input
+                  type="date"
+                  className="form-control date-input-fixed"
+                  value={formData.date}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  required
+                />
+              </div>
             </div>
 
             <div className="col-md-6">
               <label className="fw-bold mb-2">عدد الضيوف</label>
+
               <input
                 type="number"
                 min="1"
@@ -314,7 +325,9 @@ export default function Reservation() {
                   {loadingSlots ? (
                     <div className="d-flex align-items-center gap-2">
                       <div className="spinner-border text-warning spinner-border-sm" />
-                      <span className="text-muted small">جاري تحميل الأوقات...</span>
+                      <span className="text-muted small">
+                        جاري تحميل الأوقات...
+                      </span>
                     </div>
                   ) : !formData.date ? (
                     <p className="text-muted small m-0">
@@ -350,6 +363,7 @@ export default function Reservation() {
 
             <div className="col-12">
               <label className="fw-bold mb-2">ملاحظات</label>
+
               <textarea
                 className="form-control"
                 rows="3"
@@ -366,7 +380,8 @@ export default function Reservation() {
           </div>
 
           <div className="alert alert-info mt-4 text-center py-2">
-            ملخص: الحجز لـ {formData.party_size} أشخاص بتاريخ {formData.date || '---'}{' '}
+            ملخص: الحجز لـ {formData.party_size} أشخاص بتاريخ{' '}
+            {formData.date || '---'}{' '}
             {formData.start_time && formData.end_time
               ? `من ${formData.start_time} إلى ${formData.end_time}`
               : '— اختر وقتًا من الأوقات المتاحة'}

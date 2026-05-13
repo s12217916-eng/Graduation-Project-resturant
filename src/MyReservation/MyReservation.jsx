@@ -19,14 +19,24 @@ export default function MyReservation() {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const getAccessToken = () => localStorage.getItem('access');
+  const getAccessToken = () =>
+    localStorage.getItem('access') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken');
+
+  const getArray = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.reservations)) return data.reservations;
+    return [];
+  };
 
   const getRestaurantId = (res) => {
     return (
       res.restaurant_id ||
       res.restaurant?.id ||
-      res.restaurant ||
       res.restaurant_uuid ||
+      res.restaurant ||
       ''
     );
   };
@@ -44,6 +54,7 @@ export default function MyReservation() {
     return (
       res.restaurant_image ||
       res.restaurant?.image ||
+      res.restaurant?.image_url ||
       res.restaurant?.main_image ||
       'https://via.placeholder.com/150?text=Restaurant'
     );
@@ -68,6 +79,16 @@ export default function MyReservation() {
     return String(time).slice(0, 5);
   };
 
+  const authHeaders = () => {
+    const access = getAccessToken();
+
+    return {
+      Authorization: `Bearer ${access}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+  };
+
   const fetchMyReservations = async () => {
     const access = getAccessToken();
 
@@ -80,16 +101,11 @@ export default function MyReservation() {
     setLoading(true);
 
     try {
-      const response = await axios.get(`${API_BASE}/reservations`, {
-        headers: {
-          Authorization: `Bearer ${access}`,
-          Accept: 'application/json',
-        },
+      const response = await axios.get(`${API_BASE}/client/reservations`, {
+        headers: authHeaders(),
       });
 
-      const data = response?.data;
-      setReservations(Array.isArray(data) ? data : data?.results || []);
-      console.log('MY RESERVATIONS =>', data);
+      setReservations(getArray(response.data));
     } catch (error) {
       console.error('Error fetching reservations:', error?.response?.data || error);
       setReservations([]);
@@ -135,16 +151,12 @@ export default function MyReservation() {
 
     try {
       await axios.post(
-        `${API_BASE}/restaurants/${restaurantId}/reservations/${reservationId}/cancel/`,
+        `${API_BASE}/client/restaurants/${restaurantId}/reservations/${reservationId}/cancel/`,
         {
           reason: result.value || 'تم الإلغاء من قبل المستخدم',
         },
         {
-          headers: {
-            Authorization: `Bearer ${access}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
+          headers: authHeaders(),
         }
       );
 
@@ -154,6 +166,7 @@ export default function MyReservation() {
       console.error('Cancel reservation error:', error?.response?.data || error);
 
       const data = error?.response?.data;
+
       Swal.fire(
         'خطأ',
         data?.detail || data?.message || 'فشل في إلغاء الحجز',
@@ -217,14 +230,10 @@ export default function MyReservation() {
 
     try {
       await axios.put(
-        `${API_BASE}/restaurants/${restaurantId}/reservations/${reservationId}`,
+        `${API_BASE}/client/restaurants/${restaurantId}/reservations/${reservationId}`,
         value,
         {
-          headers: {
-            Authorization: `Bearer ${access}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
+          headers: authHeaders(),
         }
       );
 
@@ -234,6 +243,7 @@ export default function MyReservation() {
       console.error('Update reservation error:', error?.response?.data || error);
 
       const data = error?.response?.data;
+
       Swal.fire(
         'خطأ',
         data?.detail ||
@@ -253,6 +263,7 @@ export default function MyReservation() {
       confirmed: { bg: '#d4edda', color: '#155724', text: 'مؤكد' },
       pending: { bg: '#fff3cd', color: '#856404', text: 'بانتظار الموافقة' },
       cancelled: { bg: '#f8d7da', color: '#721c24', text: 'ملغي' },
+      canceled: { bg: '#f8d7da', color: '#721c24', text: 'ملغي' },
       rejected: { bg: '#e2e3e5', color: '#383d41', text: 'مرفوض' },
     };
 
@@ -345,6 +356,7 @@ export default function MyReservation() {
       <div className="container">
         <div className="d-flex justify-content-between align-items-center mb-5">
           <h2 className="fw-black m-0">حجوزاتي</h2>
+
           <div className="bg-white p-2 px-4 rounded-pill shadow-sm border">
             <small className="text-muted">إجمالي الحجوزات: </small>
             <span className="fw-bold text-warning">{reservations.length}</span>
@@ -398,7 +410,8 @@ export default function MyReservation() {
 
                       <span className="info-pill">
                         <FaClock className="text-warning" />
-                        الوقت: {normalizeTime(res.start_time)} - {normalizeTime(res.end_time)}
+                        الوقت: {normalizeTime(res.start_time)} -{' '}
+                        {normalizeTime(res.end_time)}
                       </span>
 
                       <span className="info-pill">
@@ -419,27 +432,29 @@ export default function MyReservation() {
                     )}
                   </div>
 
-                  {res.status !== 'cancelled' && res.status !== 'rejected' && (
-                    <div className="d-flex flex-row flex-md-column gap-2">
-                      <button
-                        type="button"
-                        className="edit-btn fw-bold"
-                        onClick={() => handleEdit(res)}
-                      >
-                        <FaEdit className="ms-1" />
-                        تعديل
-                      </button>
+                  {res.status !== 'cancelled' &&
+                    res.status !== 'canceled' &&
+                    res.status !== 'rejected' && (
+                      <div className="d-flex flex-row flex-md-column gap-2">
+                        <button
+                          type="button"
+                          className="edit-btn fw-bold"
+                          onClick={() => handleEdit(res)}
+                        >
+                          <FaEdit className="ms-1" />
+                          تعديل
+                        </button>
 
-                      <button
-                        type="button"
-                        className="cancel-btn fw-bold"
-                        onClick={() => handleCancel(res)}
-                      >
-                        <FaTimesCircle className="ms-1" />
-                        إلغاء
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          className="cancel-btn fw-bold"
+                          onClick={() => handleCancel(res)}
+                        >
+                          <FaTimesCircle className="ms-1" />
+                          إلغاء
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
             ))}

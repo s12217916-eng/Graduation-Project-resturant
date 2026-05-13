@@ -3,6 +3,8 @@ import axios from 'axios';
 import { FaHeart, FaUtensils, FaMapMarkerAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
+const API = 'https://revvo-server.onrender.com/api';
+
 export default function SavedRestaurants() {
   const navigate = useNavigate();
 
@@ -10,12 +12,18 @@ export default function SavedRestaurants() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const getToken = () => {
-    return (
-      localStorage.getItem('token') ||
-      localStorage.getItem('access') ||
-      localStorage.getItem('accessToken')
-    );
+  const getToken = () =>
+    localStorage.getItem('access') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken');
+
+  const getArray = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.saves)) return data.saves;
+    if (Array.isArray(data?.saved)) return data.saved;
+    if (Array.isArray(data?.restaurants)) return data.restaurants;
+    return [];
   };
 
   const fetchSavedRestaurants = async () => {
@@ -27,32 +35,27 @@ export default function SavedRestaurants() {
 
       if (!token) {
         setErrorMessage('يجب تسجيل الدخول لعرض المطاعم المفضلة');
+        setLoading(false);
         return;
       }
 
-      const response = await axios.get(
-        'https://revvo-server.onrender.com/api/user/saved/',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await axios.get(`${API}/client/saves/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
 
-      const data = response?.data;
+      const savesData = getArray(response.data);
 
-      if (Array.isArray(data)) {
-        setRestaurants(data);
-      } else if (Array.isArray(data?.results)) {
-        setRestaurants(data.results);
-      } else if (Array.isArray(data?.saved)) {
-        setRestaurants(data.saved);
-      } else if (Array.isArray(data?.restaurants)) {
-        setRestaurants(data.restaurants);
-      } else {
-        setRestaurants([]);
-      }
+      const normalizedRestaurants = savesData
+        .map((item) => item.restaurant || item)
+        .filter(Boolean);
+
+      setRestaurants(normalizedRestaurants);
     } catch (error) {
+      console.error('Fetch saved restaurants error:', error?.response?.data || error);
+
       const data = error?.response?.data;
 
       let message = 'فشل تحميل المطاعم المفضلة';
@@ -113,60 +116,58 @@ export default function SavedRestaurants() {
 
         {!loading && !errorMessage && restaurants.length > 0 && (
           <div className="row g-4">
-            {restaurants.map((item) => {
-              const restaurant = item.restaurant || item;
-
-              return (
-                <div className="col-md-6 col-lg-4" key={restaurant.id || item.id}>
-                  <div className="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
-                    {restaurant.image_url || restaurant.image ? (
-                      <img
-                        src={restaurant.image_url || restaurant.image}
-                        className="card-img-top"
-                        alt={restaurant.name || 'Restaurant'}
-                        style={{
-                          height: '190px',
-                          objectFit: 'cover',
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className="d-flex align-items-center justify-content-center bg-light"
-                        style={{ height: '190px' }}
-                      >
-                        <FaUtensils size={45} className="text-muted" />
-                      </div>
-                    )}
-
-                    <div className="card-body">
-                      <h5 className="fw-bold mb-2">
-                        {restaurant.name ||
-                          restaurant.restaurant_name ||
-                          'مطعم بدون اسم'}
-                      </h5>
-
-                      <p className="text-muted small mb-3">
-                        <FaMapMarkerAlt className="ms-1 text-danger" />
-                        {restaurant.location ||
-                          restaurant.address ||
-                          restaurant.restaurant_location ||
-                          'لا يوجد موقع'}
-                      </p>
-
-                      <button
-                        type="button"
-                        className="btn btn-warning w-100 rounded-pill fw-bold"
-                        onClick={() =>
-                          navigate(`/resturant/${restaurant.id || item.id}`)
-                        }
-                      >
-                        عرض التفاصيل
-                      </button>
+            {restaurants.map((restaurant, index) => (
+              <div
+                className="col-md-6 col-lg-4"
+                key={restaurant.id || index}
+              >
+                <div className="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                  {restaurant.image || restaurant.image_url ? (
+                    <img
+                      src={restaurant.image || restaurant.image_url}
+                      className="card-img-top"
+                      alt={restaurant.name || 'Restaurant'}
+                      style={{
+                        height: '190px',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="d-flex align-items-center justify-content-center bg-light"
+                      style={{ height: '190px' }}
+                    >
+                      <FaUtensils size={45} className="text-muted" />
                     </div>
+                  )}
+
+                  <div className="card-body">
+                    <h5 className="fw-bold mb-2">
+                      {restaurant.name ||
+                        restaurant.restaurant_name ||
+                        'مطعم بدون اسم'}
+                    </h5>
+
+                    <p className="text-muted small mb-3">
+                      <FaMapMarkerAlt className="ms-1 text-danger" />
+                      {restaurant.address ||
+                        restaurant.location ||
+                        restaurant.restaurant_location ||
+                        'لا يوجد موقع'}
+                    </p>
+
+                    <button
+                      type="button"
+                      className="btn btn-warning w-100 rounded-pill fw-bold"
+                      onClick={() => navigate(`/resturant/${restaurant.id}`)}
+                      disabled={!restaurant.id}
+                    >
+                      عرض التفاصيل
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
