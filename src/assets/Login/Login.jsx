@@ -93,7 +93,7 @@ const role =
   response?.user?.role ||
   response?.role;
 
-if (role === 'OWNER') {
+if (role === 'OWNER' || role === 'ADMIN') {
   navigate('/dashboard');
 } else {
   navigate('/');

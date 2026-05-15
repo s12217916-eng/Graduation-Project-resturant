@@ -12,6 +12,15 @@ export default function Navbar() {
     setLoggedIn(isAuthenticated());
   }, [location.pathname]);
 
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = user?.role === 'ADMIN';
+  const isOwner = user?.role === 'OWNER';
+
+  if (loggedIn && (isOwner || isAdmin)) {
+    return null;
+  }
+
   const handleLogout = async () => {
     await logoutUser();
     setLoggedIn(false);

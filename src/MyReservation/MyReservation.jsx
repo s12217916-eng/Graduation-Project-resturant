@@ -13,7 +13,7 @@ import {
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
-const API_BASE = 'https://revvo-server.onrender.com/api';
+const API_BASE = 'http://localhost:8000/api';
 
 export default function MyReservation() {
   const [reservations, setReservations] = useState([]);

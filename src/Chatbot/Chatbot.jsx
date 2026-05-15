@@ -67,7 +67,7 @@ export default function Chatbot() {
             width: 350px;
             height: 500px;
             bottom: 100px;
-            right: 25px;
+            left: 25px;
             animation: slideIn 0.4s ease-out;
         }
         @keyframes slideIn {
@@ -83,7 +83,7 @@ export default function Chatbot() {
             {/* زر فتح الشات العائم */}
             <button 
                 className="btn chat-floating-btn rounded-circle shadow-lg d-flex align-items-center justify-content-center"
-                style={{ position: 'fixed', bottom: '25px', right: '25px', width: '65px', height: '65px', zIndex: 1000 }}
+                style={{ position: 'fixed', bottom: '25px', left: '25px', width: '65px', height: '65px', zIndex: 1000 }}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 {isOpen ? (

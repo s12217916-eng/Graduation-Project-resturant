@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FaHeart, FaUtensils, FaMapMarkerAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-const API = 'https://revvo-server.onrender.com/api';
+const API = 'http://localhost:8000/api';
 
 export default function SavedRestaurants() {
   const navigate = useNavigate();

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
-const API_BASE = 'https://revvo-server.onrender.com/api';
+const API_BASE = 'http://localhost:8000/api';
 
 export default function Reservation() {
   const { id } = useParams();

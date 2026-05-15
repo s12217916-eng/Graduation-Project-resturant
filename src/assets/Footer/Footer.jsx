@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedinIn } from "react-icons/fa";
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { isAuthenticated } from '../../services/authService';
 
 export default function Footer() {
+    const location = useLocation();
+    const [loggedIn, setLoggedIn] = useState(isAuthenticated());
+
+    useEffect(() => {
+        setLoggedIn(isAuthenticated());
+    }, [location.pathname]);
+
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const isAdmin = user?.role === 'ADMIN';
+    const isOwner = user?.role === 'OWNER';
+
+    if (loggedIn && (isOwner || isAdmin)) {
+        return null;
+    }
     const customStyles = `
         .main-footer {
             background-color: #0f0f0f; /* أسود أعمق للفخامة */
