@@ -114,7 +114,7 @@ export default function Footer() {
                         <ul className="list-unstyled">
                             <li><Link to="/" className="footer-link text-decoration-none">الرئيسية</Link></li>
                             <li><Link to="/resturant" className="footer-link text-decoration-none">المطاعم</Link></li>
-                            <li><Link to="/reservation" className="footer-link text-decoration-none">الحجوزات</Link></li>
+                            <li><Link to="/myreservations" className="footer-link text-decoration-none">الحجوزات</Link></li>
                             <li><Link to="/about" className="footer-link text-decoration-none">عن الموقع</Link></li>
                         </ul>
                     </div>

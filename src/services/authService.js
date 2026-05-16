@@ -127,6 +127,14 @@ export const changePassword = async (data) => {
   return response.data;
 };
 
+export const getClientReviews = async () => {
+  const response = await axiosInstance.get(
+    '/client/reviews/'
+  );
+
+  return response.data;
+};
+
 export const isAuthenticated = () => {
   return !!localStorage.getItem('access');
 };

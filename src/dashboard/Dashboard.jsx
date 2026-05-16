@@ -2,6 +2,7 @@
 import axios from 'axios';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdminDashboard from './AdminDashboard';
 import { logoutUser, getProfile, updateProfile } from '../services/authService';
 import {
   LayoutDashboard,
@@ -194,6 +195,17 @@ const SECTION_NAMES = {
   ai_assistant: 'المساعد الذكي'
 };
 
+const SECTION_ICONS = {
+  overview: <LayoutDashboard size={20} />,
+  restaurant: <Store size={20} />,
+  reservations: <Calendar size={20} />,
+  reviews: <Star size={20} />,
+  license: <FileText size={20} />,
+  analytics: <BarChart3 size={20} />,
+  profile: <User size={20} />,
+  ai_assistant: <Sparkles size={20} />,
+};
+
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -299,8 +311,18 @@ export default function Dashboard() {
   const [activeRestTab, setActiveRestTab] = useState('info'); // 'info', 'hours', 'images', 'menu'
   const [restMenuOpen, setRestMenuOpen] = useState(false);
   const [reviewsAiRange, setReviewsAiRange] = useState('7');
+  const [reviewFilters, setReviewFilters] = useState({
+    search: '',
+    sentiment: '',
+    rating: '',
+    sort: 'newest',
+    dateFrom: '',
+    dateTo: '',
+  });
   const [resAiRange, setResAiRange] = useState('7');
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
 
   // ── AI ASSISTANT STATE ──
   const [aiMessages, setAiMessages] = useState([
@@ -314,6 +336,17 @@ export default function Dashboard() {
       aiMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [aiMessages, activeSection]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileMenuOpen]);
 
   const handleAiSend = (e) => {
     e.preventDefault();
@@ -334,6 +367,8 @@ export default function Dashboard() {
 
   // Automatically fetch data when sections or tabs change
   useEffect(() => {
+    if (!profileLoaded) fetchProfileData();
+
     // Overview / Status
     if (activeSection === 'overview' || activeSection === 'status') {
       fetchStatus();
@@ -1020,9 +1055,7 @@ export default function Dashboard() {
     { key: 'reviews', label: 'التقييمات', icon: <Star size={20} /> },
     { key: 'license', label: 'الرخصة', icon: <FileText size={20} />, dirty: licenseDirty },
     { key: 'analytics', label: 'التحليلات', icon: <BarChart3 size={20} /> },
-    { key: 'profile', label: 'البروفايل', icon: <User size={20} /> },
     { key: 'ai_assistant', label: 'المساعد الذكي', icon: <Sparkles size={20} />, isAI: true },
-    { key: 'logout', label: 'تسجيل خروج', icon: <LogOut size={20} /> },
   ];
 
 
@@ -2557,10 +2590,24 @@ export default function Dashboard() {
 
 
       // ── REVIEWS ────────────────────────────────────────────
-      case 'reviews':
-        if (reviewsLoading) return <Spinner />;
+      case 'reviews': {
         const reviewList = reviews?.results || [];
         const hasReviews = reviewList.length > 0;
+        const hasActiveReviewFilters = Boolean(
+          reviewFilters.search ||
+          reviewFilters.sentiment ||
+          reviewFilters.rating ||
+          reviewFilters.dateFrom ||
+          reviewFilters.dateTo
+        );
+        const resetReviewFilters = () => setReviewFilters({
+          search: '',
+          sentiment: '',
+          rating: '',
+          sort: 'newest',
+          dateFrom: '',
+          dateTo: '',
+        });
 
         return (
           <div style={{ ...styles.card, padding: 0, overflow: 'hidden' }}>
@@ -2600,32 +2647,119 @@ export default function Dashboard() {
 
               {activeReviewsTab === 'list' ? (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 15 }}>
-                    <button style={styles.btnOutline} onClick={fetchReviews}>تحديث 🔄</button>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 24,
+                    flexWrap: 'wrap',
+                    background: '#f8fafb',
+                    padding: '12px 16px',
+                    borderRadius: 14,
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <button
+                      type="button"
+                      style={styles.btnOutline}
+                      onClick={fetchReviews}
+                      disabled={reviewsLoading}
+                    >
+                      {reviewsLoading ? 'جاري التحديث...' : '🔄 تحديث'}
+                    </button>
+
+                    {hasActiveReviewFilters && (
+                      <button type="button" style={styles.btnOutline} onClick={resetReviewFilters}>
+                        مسح الفلاتر
+                      </button>
+                    )}
+
+                    <div style={{ flex: 1 }} />
+
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }}>🔍</span>
+                        <input
+                          type="text"
+                          placeholder="بحث في التقييمات..."
+                          value={reviewFilters.search}
+                          onChange={(e) => setReviewFilters(f => ({ ...f, search: e.target.value }))}
+                          style={{ ...styles.input, width: 180, paddingRight: 35, marginBottom: 0 }}
+                        />
+                      </div>
+
+                      <select
+                        value={reviewFilters.sentiment}
+                        onChange={(e) => setReviewFilters(f => ({ ...f, sentiment: e.target.value }))}
+                        style={{ ...styles.input, width: 130, marginBottom: 0 }}
+                      >
+                        <option value="">كل المشاعر</option>
+                        <option value="POSITIVE">إيجابي</option>
+                        <option value="NEUTRAL">محايد</option>
+                        <option value="NEGATIVE">سلبي</option>
+                      </select>
+
+                      <select
+                        value={reviewFilters.rating}
+                        onChange={(e) => setReviewFilters(f => ({ ...f, rating: e.target.value }))}
+                        style={{ ...styles.input, width: 130, marginBottom: 0 }}
+                      >
+                        <option value="">كل التقييمات</option>
+                        <option value="5">5 نجوم</option>
+                        <option value="4">4 نجوم فأكثر</option>
+                        <option value="3">3 نجوم فأكثر</option>
+                        <option value="2">2 نجوم فأكثر</option>
+                        <option value="1">1 نجمة فأكثر</option>
+                      </select>
+
+                      <select
+                        value={reviewFilters.sort}
+                        onChange={(e) => setReviewFilters(f => ({ ...f, sort: e.target.value }))}
+                        style={{ ...styles.input, width: 150, marginBottom: 0 }}
+                      >
+                        <option value="newest">الأحدث أولاً</option>
+                        <option value="oldest">الأقدم أولاً</option>
+                        <option value="highest">الأعلى تقييماً</option>
+                        <option value="lowest">الأقل تقييماً</option>
+                      </select>
+
+                      <input
+                        type="date"
+                        value={reviewFilters.dateFrom}
+                        onChange={(e) => setReviewFilters(f => ({ ...f, dateFrom: e.target.value }))}
+                        title="من تاريخ"
+                        style={{ ...styles.input, width: 150, marginBottom: 0 }}
+                      />
+                      <input
+                        type="date"
+                        value={reviewFilters.dateTo}
+                        onChange={(e) => setReviewFilters(f => ({ ...f, dateTo: e.target.value }))}
+                        title="إلى تاريخ"
+                        style={{ ...styles.input, width: 150, marginBottom: 0 }}
+                      />
+                    </div>
                   </div>
 
-                  {/* Average Ratings */}
-                  {hasReviews && (
-                    <div style={{ ...styles.statsGrid, marginBottom: 24 }}>
-                      {[
-                        { label: 'متوسط الطعام', value: reviews.avg_food, color: '#f59e0b' },
-                        { label: 'متوسط الخدمة', value: reviews.avg_service, color: '#10b981' },
-                        { label: 'متوسط الأجواء', value: reviews.avg_ambiance, color: '#6366f1' },
-                      ].map(s => (
-                        <div key={s.label} style={{ ...styles.statCard, padding: '16px 12px', borderTop: `3px solid ${s.color}` }}>
-                          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{s.label}</div>
-                          <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value} <span style={{ fontSize: 14 }}>⭐</span></div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!hasReviews ? (
+                  {reviewsLoading && !reviewsLoaded ? (
+                    <div style={{ padding: '60px 0' }}><Spinner /></div>
+                  ) : !hasReviews ? (
                     <div style={{ textAlign: 'center', color: '#9ca3af', padding: 60, fontSize: 15 }}>
                       لا توجد تقييمات حتى الآن
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ position: 'relative' }}>
+                      {reviewsLoading && (
+                        <div style={{
+                          position: 'absolute', inset: 0, zIndex: 2, borderRadius: 14,
+                          background: 'rgba(255,255,255,0.7)', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          <Spinner />
+                        </div>
+                      )}
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 14,
+                        opacity: reviewsLoading ? 0.5 : 1, transition: 'opacity 0.2s ease'
+                      }}>
                       {reviewList.map((r, i) => (
                         <div key={r.id || i} style={{
                           border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px',
@@ -2669,6 +2803,7 @@ export default function Dashboard() {
                           )}
                         </div>
                       ))}
+                      </div>
                     </div>
                   )}
                 </>
@@ -2708,6 +2843,7 @@ export default function Dashboard() {
             </div>
           </div>
         );
+      }
 
 
 
@@ -2735,7 +2871,6 @@ export default function Dashboard() {
 
       // ── PROFILE ────────────────────────────────────────────
       case 'profile':
-        if (profileLoading) return <Spinner />;
         return (
           <div style={{ ...styles.card, padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px 0 20px' }}>
@@ -2775,7 +2910,25 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div style={{ padding: '24px 28px' }}>
+            <div style={{ padding: '24px 28px', position: 'relative', minHeight: 220 }}>
+              {profileLoading && !profileLoaded ? (
+                <div style={{ padding: '60px 0' }}><Spinner /></div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  {profileLoading && (
+                    <div style={{
+                      position: 'absolute', inset: 0, zIndex: 2, borderRadius: 12,
+                      background: 'rgba(255,255,255,0.7)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <Spinner />
+                    </div>
+                  )}
+                  <div style={{
+                    opacity: profileLoading ? 0.5 : 1,
+                    transition: 'opacity 0.2s ease',
+                    pointerEvents: profileLoading ? 'none' : 'auto'
+                  }}>
               {activeProfileTab === 'info' && (
                 <div style={{ animation: 'slideIn 0.3s ease' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 24 }}>
@@ -2943,6 +3096,9 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -3064,6 +3220,7 @@ export default function Dashboard() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes profileMenuIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
         input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
@@ -3328,7 +3485,7 @@ export default function Dashboard() {
                 width: 40, height: 40, borderRadius: 12, background: 'rgba(245, 158, 11, 0.1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b'
               }}>
-                {sidebarItems.find(i => i.key === activeSection)?.icon}
+                {SECTION_ICONS[activeSection]}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>{SECTION_NAMES[activeSection]}</div>
@@ -3384,19 +3541,70 @@ export default function Dashboard() {
                 }} />
               </div>
 
-              {/* Profile Avatar */}
-              <div
-                onClick={() => handleNav('profile')}
-                style={{
-                  width: 44, height: 44, borderRadius: 12, overflow: 'hidden',
-                  border: '2px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer'
-                }}
-              >
-                <img
-                  src={profileData.image_url || 'https://via.placeholder.com/44'}
-                  alt="Profile"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+              {/* Profile menu */}
+              <div ref={profileMenuRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen(open => !open)}
+                  aria-expanded={profileMenuOpen}
+                  aria-haspopup="menu"
+                  style={{
+                    width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', padding: 0,
+                    border: profileMenuOpen ? '2px solid #f59e0b' : '2px solid #fff',
+                    boxShadow: profileMenuOpen ? '0 0 0 3px rgba(245, 158, 11, 0.2)' : '0 2px 8px rgba(0,0,0,0.1)',
+                    cursor: 'pointer', background: 'none', transition: 'all 0.2s ease'
+                  }}
+                >
+                  <img
+                    src={profileData.image_url || 'https://via.placeholder.com/44'}
+                    alt="Profile"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </button>
+
+                {profileMenuOpen && (
+                  <div
+                    role="menu"
+                    style={{
+                      position: 'absolute', top: 'calc(100% + 10px)', left: 0, minWidth: 210,
+                      background: '#fff', borderRadius: 14, border: '1px solid #eef2f6',
+                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.12)', padding: 8, zIndex: 200,
+                      animation: 'profileMenuIn 0.18s ease'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setProfileMenuOpen(false); handleNav('profile'); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        padding: '11px 14px', border: 'none', borderRadius: 10, background: 'transparent',
+                        cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#334155', textAlign: 'right'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <User size={18} color="#f59e0b" />
+                      <span>إعدادات الملف الشخصي</span>
+                    </button>
+                    <div style={{ height: 1, background: '#f1f5f9', margin: '4px 8px' }} />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={async () => { setProfileMenuOpen(false); await handleLogout(); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        padding: '11px 14px', border: 'none', borderRadius: 10, background: 'transparent',
+                        cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#dc2626', textAlign: 'right'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <LogOut size={18} />
+                      <span>تسجيل خروج</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

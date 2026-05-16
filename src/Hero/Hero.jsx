@@ -53,12 +53,12 @@ export default function Hero() {
 
         .hero-content {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            inset: 0;
             z-index: 10;
-            width: 100%;
-            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             text-align: center;
             padding: 0 20px;
         }
@@ -98,6 +98,7 @@ export default function Hero() {
 
         /* تنسيق السيرش ليطابق صفحة المطاعم وفخامة الهيرو */
         .search-box-container {
+            width: 100%;
             max-width: 650px;
             margin: 0 auto;
             animation: fadeInUp 0.8s ease 0.6s forwards;
