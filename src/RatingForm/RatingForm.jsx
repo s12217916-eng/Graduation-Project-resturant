@@ -33,7 +33,7 @@ export default function RatingForm() {
     const fetchMenu = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:8000/api/restaurants/${id}/menu/`
+          `https://revvo-server.onrender.com/api/restaurants/${id}/menu/`
         );
 
         const menuData = response.data || [];

@@ -23,7 +23,7 @@ export default function Resturant() {
 
     // جلب البيانات الأساسية
     useEffect(() => {
-        axios.get('http://localhost:8000/api/restaurants')
+        axios.get('https://revvo-server.onrender.com/api/restaurants')
             .then(res => {
                 const data = res.data.results;
                 setRestaurants(data);

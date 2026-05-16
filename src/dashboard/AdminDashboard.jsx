@@ -22,8 +22,8 @@ import {
   BarChart3
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000/api/admin';
-const API_AUTH = 'http://localhost:8000/api/auth';
+const API_BASE = 'https://revvo-server.onrender.com/api/admin';
+const API_AUTH = 'https://revvo-server.onrender.com/api/auth';
 
 const SECTION_NAMES = {
   overview: 'نظرة عامة',
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
   const fixImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return `http://localhost:8000${url}`;
+    return `https://revvo-server.onrender.com${url}`;
   };
 
   const fetchProfileData = async () => {

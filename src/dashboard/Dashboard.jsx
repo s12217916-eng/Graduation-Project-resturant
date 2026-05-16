@@ -70,7 +70,7 @@ function RecenterMap({ lat, lon }) {
 
 
 
-const API = 'http://localhost:8000/api';
+const API = 'https://revvo-server.onrender.com/api';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 const token = () =>
@@ -726,7 +726,7 @@ export default function Dashboard() {
   const fixImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return `http://localhost:8000${url}`;
+    return `https://revvo-server.onrender.com${url}`;
   };
 
   const normalizeImages = (data) => {
